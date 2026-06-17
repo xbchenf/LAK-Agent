@@ -31,55 +31,158 @@
 
 ```
 lak-ai-platform/
-├── CLAUDE.md                                  # 本文件
+├── CLAUDE.md
 ├── 政法智能知识Agent平台.md                     # 项目总纲
 ├── pom.xml
 ├── docs/
 │   └── design/
-│       ├── 系统架构设计说明书.md                  # 架构分层 + Filter Chain + 状态机
-│       ├── 数据库设计说明书.md                    # 6个核心表DDL
-│       └── 接口设计说明书.md                      # API Spec + 错误码
+│       ├── 系统架构设计说明书.md
+│       ├── 数据库设计说明书.md
+│       └── 接口设计说明书.md
 ├── src/main/java/com/lak/ai/
 │   ├── LakAiApplication.java
-│   ├── agent/                                  # Agent编排
-│   │   ├── master/                             #   MasterAgent
-│   │   ├── sub/                                #   子Agent实现
-│   │   └── scheduler/                          #   SubAgentScheduler
-│   ├── rag/                                    # RAG检索引擎
-│   │   ├── embedding/
-│   │   ├── retriever/
-│   │   ├── reranker/
-│   │   └── tracer/                             #   SourceTracer
-│   ├── chat/                                   # 对话管理
-│   │   ├── session/                            #   会话状态机
-│   │   ├── context/                            #   上下文窗口
-│   │   └── slot/                               #   Slot-Filling
-│   ├── ticket/                                 # 工单模块
-│   └── common/                                 # 公共组件
-│       ├── response/                           #   ApiResponse
-│       ├── exception/                          #   全局异常
-│       └── constant/                           #   常量/枚举
+│   ├── controller/                              # 控制器层（接口暴露）
+│   │   ├── AuthController                       #   /api/v1/auth/*
+│   │   ├── ChatController                       #   /api/v1/chat/*
+│   │   ├── TicketController                     #   /api/v1/tickets/*
+│   │   └── AdminController                      #   /api/v1/admin/*
+│   ├── service/                                 # 业务逻辑层
+│   │   ├── agent/                               #   Agent编排
+│   │   │   ├── master/                          #     MasterAgent（意图+置信度）
+│   │   │   ├── sub/                             #     子Agent（PolicyAgent等）
+│   │   │   └── scheduler/                       #     SubAgentScheduler
+│   │   ├── rag/                                 #   RAG引擎
+│   │   │   ├── embedding/                       #     EmbeddingService
+│   │   │   ├── retriever/                       #     HybridRetriever
+│   │   │   ├── chunker/                         #     DocumentChunker
+│   │   │   └── tracer/                          #     SourceTracer
+│   │   ├── chat/                                #   对话管理
+│   │   │   ├── session/                         #     SessionManager
+│   │   │   ├── context/                         #     ContextWindow
+│   │   │   └── slot/                            #     SlotFillingEngine
+│   │   ├── ticket/                              #   工单模块
+│   │   ├── audit/                               #   审计日志
+│   │   └── security/                            #   安全服务
+│   ├── mapper/                                  # Mybatis-Plus Mapper
+│   ├── model/                                   # 数据模型（按子包分类）
+│   │   ├── entity/                              #   数据库实体（DO）
+│   │   ├── dto/                                 #   数据传输对象
+│   │   ├── vo/                                  #   视图对象（响应VO）
+│   │   └── bo/                                  #   业务对象
+│   ├── enums/                                   # 枚举类
+│   ├── constant/                                # 常量类
+│   ├── exception/                               # 自定义异常
+│   ├── common/                                  # 公共组件
+│   │   ├── response/                            #   ApiResponse / PageResult
+│   │   └── context/                             #   RequestContext / TraceId
+│   └── config/                                  # 配置类
+│       ├── security/                            #   Security / Filter 配置
+│       └── Resilience4jConfig                   #   熔断配置
 ├── src/main/resources/
 │   ├── application.yml
 │   ├── application-dev.yml
-│   └── db/migration/                           # Flyway迁移脚本
+│   ├── db/migration/                            # Flyway迁移SQL
+│   └── config/
+│       ├── prompts/                             # Agent Prompt 模板
+│       └── sensitive-words.txt                  # 敏感词库
 └── docker/
     └── docker-compose.yml
 ```
 
-## 编码规范与硬约束
+> 分层依据：阿里巴巴Java开发手册 — 分层领域模型规约：Controller → Service → Mapper，Model 下细分 entity/dto/vo/bo。
 
-- **审计日志：** 全量落库（入参/出参/模型调用/检索片段），按月分表（`audit_log_YYYYMM`），禁止物理删除，留存6个月
-- **AI答复溯源：** 每条AI答复必须携带文档来源（docId）+ 文件编号（title）+ 生效时间（effectiveDate），禁止无依据输出
-- **敏感词双向校验：** 前置Filter拦截用户输入，后置Validator校验AI答复内容；词库文件 `/config/sensitive-words.txt`，支持动态加载
-- **熔断超时：** 大模型/第三方接口必须配置 Resilience4j CircuitBreaker + 超时控制；大模型熔断阈值：5次失败/30s窗口
-- **会话管理：** Redis持久化（`session:{sessionId}` Hash），TTL 1800s（30分钟），无本地内存会话
-- **低置信度兜底：** 置信度 < 0.6 禁止AI自动作答，返回人工客服引导
+## 编码规范 — 阿里巴巴Java开发手册
+
+本工程遵循《阿里巴巴Java开发手册（泰山版）》的核心规约。以下结合 LAK-Agent 项目特点摘录关键约束。
+
+### 命名规范
+
+| 元素 | 规范 | 示例 |
+|------|------|------|
+| 包名 | 全小写，点分隔 | `com.lak.ai.service.rag` |
+| 类名 | UpperCamelCase | `PolicyAgent`, `HybridRetriever` |
+| 方法名 | lowerCamelCase | `classifyIntent()`, `searchDocuments()` |
+| 常量 | UPPER_SNAKE_CASE | `MAX_RETRY_COUNT`, `DEFAULT_TTL_SECONDS` |
+| 变量 | lowerCamelCase | `sessionId`, `confidenceThreshold` |
+| Controller | `XxxController` | `ChatController`, `AuthController` |
+| Service 接口 | `XxxService` | `ChatService`, `RagService` |
+| Service 实现 | `XxxServiceImpl` | `ChatServiceImpl` |
+| Mapper | `XxxMapper` | `ChatSessionMapper` |
+| Entity (DO) | `Xxx`（表名转UpperCamelCase） | `ChatSession`, `AuditLog` |
+| DTO | `XxxDTO` | `ChatMessageDTO`, `LoginDTO` |
+| VO | `XxxVO` | `ChatSessionVO`, `MessageVO` |
+| BO | `XxxBO` | `RoutingDecisionBO`, `ConfidenceBO` |
+| 枚举类 | `XxxEnum`（或直接描述性名称） | `IntentTypeEnum`, `SessionStatus` |
+
+### 分层领域模型（不得混用）
+
+| 模型 | 后缀 | 职责 | 使用位置 |
+|------|------|------|---------|
+| **DO** (Data Object) | `Xxx` | 与数据库表一一对应 | Mapper → Service 内部 |
+| **DTO** (Data Transfer) | `XxxDTO` | Controller 入参 / Service 间传输 | Controller → Service |
+| **VO** (View Object) | `XxxVO` | 接口响应，面向前端展示 | Controller → 前端 |
+| **BO** (Business Object) | `XxxBO` | 封装业务逻辑中间结果 | Service 内部 |
+| **Query** | `XxxQuery` | 分页/列表查询参数封装 | Controller 入参 |
+
+> **禁止**：VO 直接暴露 DO、Controller 直接返回 DO、Service 直接接收 HttpServletRequest/Response。
+
+### POJO 规约
+
+- **Boolean 字段不加 `is` 前缀**：数据库字段 `is_deleted` → Java 属性 `deleted`（Mybatis-Plus 自动映射）
+- **序列化**：DO/VO/DTO 如需序列化，实现 `Serializable` 接口并声明 `serialVersionUID`
+- **禁止 Lombok `@Data` 用在 DO 上**（集合类关联可能触发循环引用）→ 使用 `@Getter @Setter @ToString`
+
+### 异常处理
+
+```
+RuntimeException
+  └── BusinessException               # 业务异常基类（code + message）
+        ├── AuthException             #   认证异常（LAK-AUTH-xxx）
+        ├── ChatException             #   对话异常（LAK-CHAT-xxx）
+        ├── TicketException           #   工单异常（LAK-TICKET-xxx）
+        ├── SensitiveWordException    #   敏感词拦截（不返回详情）
+        ├── RateLimitException        #   限流（返回429）
+        └── ModelException            #   大模型异常（熔断/超时/不可用）
+```
+
+> **阿里巴巴规约**：不在业务代码中使用 `catch (Exception e)` 吞掉异常；不在循环内 try-catch；异常信息必须包含现场关键参数。
+
+### 日志规约（SLF4J + Logback）
+
+- **日志级别**：开发 `DEBUG`，生产 `INFO`（关键节点 `WARN`/`ERROR`）
+- **占位符**：`log.info("意图分类完成, sessionId={}, intent={}, cost={}ms", sessionId, intent, cost)` — 禁止字符串拼接
+- **禁止** `System.out.println()`、`e.printStackTrace()`
+- **审计日志**：使用 `@AuditLog` 自定义注解 + AOP 切面，统一写入 `audit_log` 表
+- **TraceId**：所有日志自动带 TraceId（Filter 注入 MDC 后 `%X{traceId}`）
+
+### 常量定义
+
+- 跨模块公共常量 → `com.lak.ai.constant.CommonConstants`
+- 模块内常量 → 各自 `XxxConstants`（如 `AgentConstants`、`ChatConstants`）
+- 禁止在代码中直接写魔法值（意图编码、状态值、阈值、超时时间均定义为常量）
+
+### Mybatis-Plus 规约
+
+- **BaseEntity**：抽取 `id`, `createTime`, `updateTime` 为公共基类，DO 继承
+- **自动填充**：`createTime` / `updateTime` 使用 Mybatis-Plus `MetaObjectHandler` 自动填充，禁止手动 `new Date()`
+- **逻辑删除**：需要软删除的表使用 `@TableLogic` 注解，`deleted = 0/1`
+- **分表**：审计日志按 `yyyyMM` 分表，使用 Mybatis-Plus 动态表名拦截器 `DynamicTableNameInnerInterceptor`
+
+## 编码规范 — 项目硬约束
+
+以下约束为 LAK-Agent 政务场景特有的合规要求，优先级高于通用规约：
+
+- **审计日志：** 全量落库（入参/出参/模型调用/检索片段），按月分表（`audit_log_yyyyMM`），禁止物理删除（仅 INSERT+SELECT 权限），留存6个月
+- **AI答复溯源：** 每条AI答复必须携带文档来源（docId）+ 文件编号（sourceNo）+ 生效时间（effectiveDate），禁止无依据输出
+- **敏感词双向校验：** 前置 Filter 拦截用户输入，后置 Validator 校验 AI 答复；词库文件 `/config/sensitive-words.txt`，支持 `POST /api/v1/admin/sensitive-words/reload` 热加载
+- **熔断超时：** 大模型/第三方接口必须配置 Resilience4j CircuitBreaker + @Retry + @Timeout；大模型熔断阈值：5次失败/30s窗口 → 触发降级
+- **会话管理：** Redis Hash 持久化（`session:{sessionId}`），TTL 1800s，禁止本地内存会话
+- **低置信度兜底：** 置信度 < 0.6 禁止 AI 自动作答，返回人工客服引导模板
 - **统一响应格式：** `{ "code": 200, "message": "success", "data": {...}, "traceId": "..." }`
-- **错误码规范：** `LAK-<模块>-<编号>`，模块含 AUTH/CHAT/TICKET/SYSTEM/VALIDATION
-- **命名规范：** 包名 `com.lak.ai`，服务名 `lak-ai-platform`，数据库 `lak_ai_platform`
-- **上下文窗口：** 保留最近10轮对话（20条消息），送入大模型的Token上限 ≤ 6000
-- **消息长度限制：** 单条消息 ≤ 2000 字符
+- **错误码规范：** 5位数字 `LAK-XX-XXX`，模块 2位 + 序号 3位（AUTH=01, CHAT=02, TICKET=03, SYSTEM=99, VALIDATION=98）
+- **命名前缀：** 包名 `com.lak.ai`，服务名 `lak-ai-platform`，数据库 `lak_ai_platform`，API 前缀 `/api/v1/`
+- **上下文窗口：** 保留最近10轮对话（20条消息），送入大模型的 Token 上限 ≤ 6000
+- **消息长度：** 单条消息 ≤ 2000 字符
 
 ## 关键架构决策
 
@@ -204,15 +307,23 @@ API前缀：`/api/v1/`
 
 | errorCode | HTTP | 含义 |
 |-----------|------|------|
-| LAK-AUTH-001 | 401 | 未认证 |
-| LAK-AUTH-004 | 400 | 验证码错误 |
-| LAK-AUTH-006~008 | 401 | Refresh Token异常 |
-| LAK-CHAT-101 | 403 | 消息命中敏感词 |
-| LAK-CHAT-102 | 429 | 请求频率过高 |
-| LAK-CHAT-103 | 504 | 大模型调用超时 |
-| LAK-CHAT-104 | 404 | 会话不存在 |
-| LAK-SYSTEM-501 | 503 | 大模型不可用（降级） |
-| LAK-VALIDATION-601 | 400 | 参数校验失败 |
+| LAK-01-001 | 401 | 未认证 |
+| LAK-01-002 | 401 | 用户名或密码错误 |
+| LAK-01-003 | 403 | 账户已禁用 |
+| LAK-01-004 | 400 | 验证码错误 |
+| LAK-01-005 | 400 | 验证码已过期 |
+| LAK-01-006 | 401 | Access Token 已过期 |
+| LAK-01-007 | 401 | Refresh Token 无效 |
+| LAK-01-008 | 401 | Token 已被废弃 |
+| LAK-02-101 | 403 | 消息命中敏感词 |
+| LAK-02-102 | 429 | 请求频率过高 |
+| LAK-02-103 | 504 | 大模型调用超时 |
+| LAK-02-104 | 404 | 会话不存在 |
+| LAK-03-201 | 500 | 工单创建失败 |
+| LAK-03-202 | 404 | 工单不存在 |
+| LAK-98-601 | 400 | 参数校验失败 |
+| LAK-99-501 | 503 | 大模型不可用（降级） |
+| LAK-99-502 | 500 | 系统内部错误 |
 
 ## 文档索引
 
