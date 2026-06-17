@@ -1,0 +1,126 @@
+# =============================================================================
+# LAK-Agent — Legal Affairs Knowledge Agent Platform
+# 政法智能知识Agent平台 — 默认配置（所有环境通用）
+# =============================================================================
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: lak-ai-platform
+
+  # ---- 默认激活 dev profile ----
+  profiles:
+    active: dev
+
+  # ---- 字符编码 ----
+  mandatory-file-encoding: UTF-8
+
+  # ---- Jackson 序列化 ----
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+  # ---- 文件上传限制 ----
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+# ---- Actuator 管理端点 ----
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+
+# ---- LangChain4j 基础配置 ----
+langchain4j:
+  dashscope:
+    chat-model:
+      api-key: ${DASHSCOPE_API_KEY:}
+      model-name: ${DASHSCOPE_MODEL:qwen3.7-max}
+      max-tokens: 4096
+      temperature: 0.1
+      timeout: 30s
+    embedding-model:
+      api-key: ${DASHSCOPE_API_KEY:}
+      model-name: ${DASHSCOPE_EMBEDDING_MODEL:text-embedding-v4}
+      timeout: 10s
+
+# ---- Resilience4j 熔断降级 ----
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 30
+        permitted-number-of-calls-in-half-open-state: 3
+        wait-duration-in-open-state: 30s
+        failure-rate-threshold: 50
+        record-exceptions:
+          - java.net.SocketTimeoutException
+          - java.io.IOException
+    instances:
+      model-call:
+        base-config: default
+        sliding-window-type: time_based
+        sliding-window-size: 30
+        minimum-number-of-calls: 5
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.net.SocketTimeoutException
+    instances:
+      model-call:
+        base-config: default
+
+# ---- SpringDoc — 仅在 dev/staging profile 启用 ----
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+# ---- Mybatis-Plus ----
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# ---- LAK 项目自定义配置 ----
+lak:
+  jwt:
+    secret: ${JWT_SECRET:lak-ai-platform-default-secret-change-in-production}
+    access-token-expiration: 7200
+    refresh-token-expiration: 604800
+  session:
+    ttl-seconds: 1800
+    max-context-rounds: 10
+    max-tokens: 6000
+  confidence:
+    threshold-high: 0.7
+    threshold-low: 0.5
+  message:
+    max-length: 2000
+  rate-limit:
+    max-requests-per-minute: 100
+    window-seconds: 60
+  sensitive-words:
+    path: config/sensitive-words.txt
+  log:
+    retention-months: 6
