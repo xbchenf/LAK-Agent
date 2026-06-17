@@ -10,6 +10,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -70,11 +72,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<?>> handleValidationException(
             MethodArgumentNotValidException e, HttpServletRequest request) {
-        String detail = e.getBindingResult().getFieldErrors().stream()
+        Map<String, String> detail = e.getBindingResult().getFieldErrors().stream()
                 .collect(Collectors.toMap(
                         FieldError::getField,
                         fe -> fe.getDefaultMessage() != null ? fe.getDefaultMessage() : "校验失败",
-                        (a, b) -> b));
+                        (a, b) -> b,
+                        LinkedHashMap::new));
         int code = 98_601; // LAK-98-601
         log.warn("参数校验失败, uri={}, detail={}", request.getRequestURI(), detail);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

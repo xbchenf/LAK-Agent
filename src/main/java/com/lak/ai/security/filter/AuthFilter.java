@@ -50,16 +50,16 @@ public class AuthFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         String path = httpRequest.getRequestURI();
 
-        // 白名单放行
+        // 白名单放行（无需认证）
         if (WHITELIST_PATHS.stream().anyMatch(path::equals)) {
             chain.doFilter(request, response);
             return;
         }
 
+        // 非白名单端点：必须提供有效 JWT
         String authHeader = httpRequest.getHeader(AUTH_HEADER);
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            // 不在此处返回 401，交给后续 Handler 处理（保持 filter 纯粹）
-            chain.doFilter(request, response);
+            sendUnauthorized(response, "LAK-01-001", "未认证，请先登录");
             return;
         }
 
@@ -79,11 +79,21 @@ public class AuthFilter implements Filter {
             httpRequest.setAttribute("roles", roles);
             chain.doFilter(request, response);
         } catch (ExpiredJwtException e) {
-            log.debug("JWT 已过期");
-            chain.doFilter(request, response);
+            log.info("JWT 已过期, path={}", path);
+            sendUnauthorized(response, "LAK-01-006", "Access Token 已过期，请刷新");
         } catch (Exception e) {
-            log.debug("JWT 解析失败: {}", e.getMessage());
-            chain.doFilter(request, response);
+            log.info("JWT 解析失败, path={}, reason={}", path, e.getMessage());
+            sendUnauthorized(response, "LAK-01-001", "未认证，请先登录");
         }
+    }
+
+    private void sendUnauthorized(ServletResponse response, String errorCode, String message)
+            throws IOException {
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
+        httpResponse.setStatus(401);
+        httpResponse.setContentType("application/json;charset=UTF-8");
+        httpResponse.getWriter().write(String.format(
+                "{\"code\":401,\"errorCode\":\"%s\",\"message\":\"%s\",\"data\":null}",
+                errorCode, message));
     }
 }

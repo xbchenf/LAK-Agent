@@ -1,10 +1,10 @@
 package com.lak.ai.security.filter;
 
+import com.lak.ai.common.filter.CachedBodyHttpServletRequestWrapper;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -40,9 +40,13 @@ public class SensitiveWordPreCheckFilter implements Filter {
             chain.doFilter(request, response);
             return;
         }
-        String body = extractBody(httpRequest);
+        // 使用 CachedBodyWrapper 读取 body，同时保证下游可再次读取
+        CachedBodyHttpServletRequestWrapper cachedRequest =
+                new CachedBodyHttpServletRequestWrapper(httpRequest);
+        String body = cachedRequest.getBody();
         if (containsSensitiveWord(body)) {
-            log.warn("敏感词前置拦截触发, uri={}", httpRequest.getRequestURI());
+            log.warn("敏感词前置拦截触发, uri={}, bodyLength={}",
+                    httpRequest.getRequestURI(), body.length());
             HttpServletResponse httpResponse = (HttpServletResponse) response;
             httpResponse.setStatus(403);
             httpResponse.setContentType("application/json;charset=UTF-8");
@@ -50,7 +54,8 @@ public class SensitiveWordPreCheckFilter implements Filter {
                     "{\"code\":403,\"message\":\"消息包含敏感内容，请调整后重试\",\"data\":null}");
             return;
         }
-        chain.doFilter(request, response);
+        // 传递 cached request 给下游 Filter/Interceptor
+        chain.doFilter(cachedRequest, response);
     }
 
     private boolean isChatMessageEndpoint(HttpServletRequest request) {
@@ -63,13 +68,6 @@ public class SensitiveWordPreCheckFilter implements Filter {
             return false;
         }
         return sensitiveWords.stream().anyMatch(word -> text.contains(word));
-    }
-
-    private String extractBody(HttpServletRequest request) throws IOException {
-        // 使用 ContentCachingRequestWrapper 或直接读取
-        // 注意：Servlet InputStream 只能读一次，后续 AuditLogInterceptor 需要协作处理
-        // 这里先做基础实现，后续通过与 AuditLogInterceptor 共享 HttpServletRequestWrapper 解决
-        return "";
     }
 
     /**
