@@ -29,18 +29,37 @@ public interface IntentService {
             - 0.3~0.5: 信息严重不足，只能猜测
             - 0.0~0.3: 完全无法判断
 
-            示例：
+            Few-Shot 校准示例（你必须在每次分类时匹配这些示例的置信度标准）：
+
             "《行政复议法》第9条规定的申请期限是多长"
-            → {"intent":"POLICY_CONSULT","confidence":0.95,"reasoning":"明确引用了具体法规名称和条款号"}
+            → {"intent":"POLICY_CONSULT","confidence":0.95,"reasoning":"明确引用具体法规名称和条款号"}
+
+            "办理行政执法证需要什么条件"
+            → {"intent":"PROCEDURE_GUIDE","confidence":0.88,"reasoning":"询问办事条件和流程，有具体事项名称"}
+
+            "我要投诉XX派出所不作为"
+            → {"intent":"COMPLAINT_SUGGEST","confidence":0.92,"reasoning":"明确表达投诉意图，指出具体对象和事由"}
 
             "怎么办护照"
-            → {"intent":"CHITCHAT","confidence":0.85,"reasoning":"护照办理不属于政法业务范围"}
+            → {"intent":"CHITCHAT","confidence":0.90,"reasoning":"护照办理不属于政法业务范围，可以确定是无关话题"}
 
-            "我想反映个问题，小区物业乱收费"
-            → {"intent":"COMPLAINT_SUGGEST","confidence":0.75,"reasoning":"涉及投诉反映问题"}
+            "行政复议的申请期限是多久"
+            → {"intent":"POLICY_CONSULT","confidence":0.80,"reasoning":"询问政策法规内容，但未指定具体法规名称"}
+
+            "小区物业乱收费，我想反映个问题"
+            → {"intent":"COMPLAINT_SUGGEST","confidence":0.78,"reasoning":"涉及投诉反映，但投诉对象比较模糊"}
+
+            "去人社局办社保转移要带什么"
+            → {"intent":"PROCEDURE_GUIDE","confidence":0.75,"reasoning":"询问办事材料和流程，有部门名称和事项"}
+
+            "执法"
+            → {"intent":"POLICY_CONSULT","confidence":0.55,"reasoning":"政法关键词但有歧义（政策咨询、办事流程或投诉都有可能）"}
+
+            "有人管吗"
+            → {"intent":"COMPLAINT_SUGGEST","confidence":0.35,"reasoning":"有投诉倾向但信息严重不足，也可能是普通询问"}
 
             "那个事怎么弄"
-            → {"intent":"UNKNOWN","confidence":0.15,"reasoning":"信息严重不足，无法判断意图"}
+            → {"intent":"UNKNOWN","confidence":0.15,"reasoning":"信息严重不足，没有任何政法业务相关信号"}
             """)
     @UserMessage("{{it}}")
     IntentClassification classify(String userMessage);
