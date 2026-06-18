@@ -129,8 +129,12 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private String tokenHash(String token) {
-        // 取 token 后 16 字节做 SHA-256 摘要，避免 Redis Key 过长
-        String suffix = token.length() > 32 ? token.substring(token.length() - 32) : token;
-        return Integer.toHexString(suffix.hashCode());
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
     }
 }
