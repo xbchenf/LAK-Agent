@@ -42,12 +42,9 @@ public class ComplianceValidator {
         }
 
         // 2. 敏感词后置校验 — 复用 SensitiveWordPreCheckFilter 的词库
-        if (sensitiveWordFilter.getWordCount() > 0) {
-            // 使用 containsSensitiveWord 逻辑检测
-            if (containsAny(answer, sensitiveWordFilter)) {
-                log.warn("合规校验失败: AI答复命中敏感词, answer摘要={}", answer.substring(0, Math.min(50, answer.length())));
-                return false;
-            }
+        if (sensitiveWordFilter.getWordCount() > 0 && sensitiveWordFilter.containsSensitiveWord(answer)) {
+            log.warn("合规校验失败: AI答复命中敏感词");
+            return false;
         }
 
         // 3. 溯源完整性校验 — 非兜底答复必须有溯源
@@ -61,11 +58,4 @@ public class ComplianceValidator {
         return true;
     }
 
-    private boolean containsAny(String text, SensitiveWordPreCheckFilter filter) {
-        if (text == null || text.isBlank() || filter.getWordCount() == 0) {
-            return false;
-        }
-        // 简化检查: 通过公开的 getWordCount 间接处理，实际检测委托 Filter 内部逻辑
-        return false; // Filter 的 containsSensitiveWord 是 private，此处做防御性设计
-    }
 }

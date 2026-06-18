@@ -34,7 +34,9 @@ public class ChatController {
     @PostMapping("/message")
     public Object sendMessage(@Valid @RequestBody ChatMessageDTO dto, HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        if (userId == null) userId = 0L;
+        if (userId == null) {
+            throw new com.lak.ai.common.exception.AuthException(1_001, "未认证");
+        }
 
         String accept = request.getHeader("Accept");
         if (accept != null && accept.contains("text/event-stream")) {

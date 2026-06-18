@@ -58,6 +58,8 @@ public class ChatService {
         if (decision.isFallback()) {
             sessionManager.transition(sessionId, SessionStatus.FALLBACK);
             AgentResponse fallbackResponse = masterAgent.fallback(sessionId, decision);
+            // 兜底答复也需要合规校验
+            validateAndLog(sessionId, fallbackResponse);
             appendToContext(sessionId, "assistant", fallbackResponse.getAnswer());
             return ChatResult.of(sessionId, fallbackResponse, decision);
         }
@@ -69,6 +71,7 @@ public class ChatService {
             // 无匹配 Agent → 走兜底
             sessionManager.transition(sessionId, SessionStatus.FALLBACK);
             AgentResponse fallback = masterAgent.fallback(sessionId, decision);
+            validateAndLog(sessionId, fallback);
             appendToContext(sessionId, "assistant", fallback.getAnswer());
             return ChatResult.of(sessionId, fallback, decision);
         }
@@ -88,6 +91,12 @@ public class ChatService {
         appendToContext(sessionId, "assistant", response.getAnswer());
 
         return ChatResult.of(sessionId, response, decision);
+    }
+
+    private void validateAndLog(String sessionId, AgentResponse response) {
+        if (!validator.validate(response, null)) {
+            log.warn("合规校验未通过(兜底路径), sessionId={}", sessionId);
+        }
     }
 
     private void appendToContext(String sessionId, String role, String content) {

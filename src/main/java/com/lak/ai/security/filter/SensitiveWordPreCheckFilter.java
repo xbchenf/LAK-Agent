@@ -80,7 +80,7 @@ public class SensitiveWordPreCheckFilter implements Filter {
                 && request.getRequestURI().contains("/api/v1/chat/message");
     }
 
-    private boolean containsSensitiveWord(String text) {
+    public boolean containsSensitiveWord(String text) {
         if (text == null || text.isBlank() || sensitiveWords.isEmpty()) {
             return false;
         }
