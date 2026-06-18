@@ -30,16 +30,18 @@
 ## 项目结构
 
 ```
-lak-ai-platform/
-├── CLAUDE.md
+LAK-Agent/
+├── CLAUDE.md                                  # 本文件
 ├── 政法智能知识Agent平台.md                     # 项目总纲
-├── pom.xml
+├── .claude/                                    # Harness 工程配置
 ├── docs/
 │   └── design/
 │       ├── 系统架构设计说明书.md
 │       ├── 数据库设计说明书.md
 │       └── 接口设计说明书.md
-├── src/main/java/com/lak/ai/
+├── backend/                                    # Spring Boot 后端
+│   ├── pom.xml
+│   └── src/main/java/com/lak/ai/
 │   ├── LakAiApplication.java
 │   ├── controller/                              # 控制器层（接口暴露）
 │   │   ├── AuthController                       #   /api/v1/auth/*
@@ -85,6 +87,9 @@ lak-ai-platform/
 │   └── config/
 │       ├── prompts/                             # Agent Prompt 模板
 │       └── sensitive-words.txt                  # 敏感词库
+├── frontend/                                    # Vue3 前端（Step 9）
+│   ├── package.json
+│   └── src/
 └── docker/
     └── docker-compose.yml
 ```
