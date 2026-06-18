@@ -1,88 +1,45 @@
 package com.lak.ai.service.agent.master;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lak.ai.enums.IntentType;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatModel;
+import com.lak.ai.model.bo.IntentClassification;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
-
 /**
- * 意图分类器 — 调用 LLM 结构化 JSON 输出进行意图分类 + 自评置信度。
+ * 意图分类器 — 委托给 LangChain4j @AiService 实现。
+ * <p>
+ * 框架自动：@SystemMessage Prompt → LLM 调用 → JSON → POJO 映射。
+ * 删除了原来 60 行手写代码（Prompt 加载、字符串替换、JSON 解析、try-catch）。
  */
 @Slf4j
 @Service
 public class IntentClassifier {
 
-    private final ChatModel chatModel;
-    private final String promptTemplate;
-    private final ObjectMapper objectMapper;
+    private final IntentService intentService;
 
-    public IntentClassifier(ChatModel chatModel, ObjectMapper objectMapper) {
-        this.chatModel = chatModel;
-        this.objectMapper = objectMapper;
-        this.promptTemplate = loadPromptTemplate();
+    public IntentClassifier(IntentService intentService) {
+        this.intentService = intentService;
     }
 
     public ClassificationResult classify(String userMessage) {
         long start = System.currentTimeMillis();
         try {
-            String prompt = promptTemplate.replace("{{userMessage}}", userMessage);
-            String responseText = chatModel.chat(
-                    SystemMessage.from("你是一个精确的意图分类器，严格遵守 JSON 格式输出。"),
-                    UserMessage.from(prompt)
-            ).aiMessage().text();
-
-            String json = extractJson(responseText);
-            @SuppressWarnings("unchecked")
-            Map<String, Object> result = objectMapper.readValue(json, Map.class);
-            String intentStr = (String) result.get("intent");
-            double confidence = ((Number) result.get("confidence")).doubleValue();
-            String reasoning = (String) result.get("reasoning");
-
+            IntentClassification result = intentService.classify(userMessage);
+            String intentStr = result.getIntent();
             IntentType intentType;
             try {
                 intentType = IntentType.valueOf(intentStr);
             } catch (IllegalArgumentException e) {
                 intentType = IntentType.UNKNOWN;
             }
-
             long costMs = System.currentTimeMillis() - start;
-            log.debug("意图分类完成, intent={}, confidence={}, cost={}ms", intentType, confidence, costMs);
-            return new ClassificationResult(intentType, confidence, reasoning, responseText, costMs);
+            log.debug("意图分类完成, intent={}, confidence={}, cost={}ms", intentType, result.getConfidence(), costMs);
+            return new ClassificationResult(intentType, result.getConfidence(), result.getReasoning(),
+                    intentStr + ":" + result.getReasoning(), costMs);
         } catch (Exception e) {
             log.error("意图分类失败", e);
             long costMs = System.currentTimeMillis() - start;
             return new ClassificationResult(IntentType.UNKNOWN, 0.0, "分类异常: " + e.getMessage(), null, costMs);
-        }
-    }
-
-    private String extractJson(String response) {
-        if (response == null) return "{}";
-        int start = response.indexOf('{');
-        int end = response.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            return response.substring(start, end + 1);
-        }
-        return "{}";
-    }
-
-    private String loadPromptTemplate() {
-        try {
-            return new String(
-                    new ClassPathResource("config/prompts/intent-classifier.txt")
-                            .getInputStream().readAllBytes(),
-                    StandardCharsets.UTF_8
-            );
-        } catch (IOException e) {
-            log.warn("意图分类Prompt加载失败，使用内置模板", e);
-            return "请分析用户意图，返回JSON: {\"intent\":\"POLICY_CONSULT|...\",\"confidence\":0.0-1.0,\"reasoning\":\"...\"}\n用户: {{userMessage}}";
         }
     }
 

@@ -1,79 +1,37 @@
 package com.lak.ai.service.agent.sub;
 
-import com.lak.ai.constant.RagConstants;
 import com.lak.ai.enums.IntentType;
-import com.lak.ai.model.bo.RagFragment;
-import com.lak.ai.service.rag.retriever.HybridRetriever;
-import com.lak.ai.service.rag.tracer.SourceTracer;
-import dev.langchain4j.model.chat.ChatModel;
+import com.lak.ai.model.bo.AgentRequest;
+import com.lak.ai.model.bo.AgentResponse;
+import com.lak.ai.service.agent.SubAgent;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.stream.Collectors;
-
 /**
- * 办事指引 Agent — 办事指南库 RAG 检索 + 带原文溯源答复。
+ * 办事指引 Agent — 委托给 @AiService(ProcedureAgentService) 实现 LLM 自主检索+生成。
  */
 @Slf4j
 @Component
-public class ProcedureAgent extends AbstractRagAgent {
+public class ProcedureAgent implements SubAgent {
 
-    private final String ragTemplate;
+    private final ProcedureAgentService agentService;
 
-    public ProcedureAgent(HybridRetriever retriever, SourceTracer tracer, ChatModel chatModel) {
-        super(retriever, tracer, chatModel);
-        this.ragTemplate = loadTemplate();
-    }
+    public ProcedureAgent(ProcedureAgentService agentService) { this.agentService = agentService; }
 
-    @Override
-    public String getAgentId() {
-        return "agent-procedure";
-    }
+    @Override public String getAgentId() { return "agent-procedure"; }
+    @Override public String getAgentName() { return "办事指引Agent"; }
+    @Override public IntentType[] getSupportedIntents() { return new IntentType[]{IntentType.PROCEDURE_GUIDE}; }
 
     @Override
-    public String getAgentName() {
-        return "办事指引Agent";
-    }
-
-    @Override
-    public IntentType[] getSupportedIntents() {
-        return new IntentType[]{IntentType.PROCEDURE_GUIDE};
-    }
-
-    @Override
-    protected String getCollection() {
-        return RagConstants.COLLECTION_PROCEDURE;
-    }
-
-    @Override
-    protected String buildRagPrompt(String userMessage, List<RagFragment> fragments) {
-        String context = fragments.stream()
-                .map(f -> String.format("【%s】%s",
-                        f.getDocTitle() != null ? f.getDocTitle() : "办事指南",
-                        f.getText()))
-                .collect(Collectors.joining("\n\n"));
-        if (context.isBlank()) {
-            context = "未检索到相关办事指南资料。";
-        }
-        return ragTemplate
-                .replace("{{question}}", userMessage)
-                .replace("{{context}}", context);
-    }
-
-    private String loadTemplate() {
+    public AgentResponse process(AgentRequest request) {
         try {
-            return new String(
-                    new ClassPathResource("config/prompts/procedure-rag.txt")
-                            .getInputStream().readAllBytes(),
-                    StandardCharsets.UTF_8
-            );
-        } catch (IOException e) {
-            log.warn("办事RAG Prompt加载失败", e);
-            return "根据以下办事指南回答问题。\n问题: {{question}}\n资料: {{context}}";
+            String answer = agentService.answer(request.getMessage());
+            return AgentResponse.builder().answer(answer).confidence(0.9)
+                    .intentType(IntentType.PROCEDURE_GUIDE.name()).build();
+        } catch (Exception e) {
+            log.error("ProcedureAgent 处理失败", e);
+            return AgentResponse.builder().answer("系统繁忙，请稍后重试。").confidence(0.0)
+                    .intentType(IntentType.PROCEDURE_GUIDE.name()).build();
         }
     }
 }
