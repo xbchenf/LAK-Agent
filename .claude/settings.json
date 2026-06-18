@@ -21,7 +21,9 @@
       "Bash(mv *)",
       "Bash(head *)",
       "Bash(tail *)",
-      "Bash(rm *)",
+      "Bash(rm src/**)",
+      "Bash(rm -r target/**)",
+      "Bash(rm *.log)",
       "Bash(touch *)"
     ],
     "deny": [
