@@ -28,14 +28,7 @@ public class EmbeddingService {
         return toFloatArray(embedding.vectorAsList());
     }
 
-    /**
-     * 批量文本转换为 Dense Vector。
-     */
-    public List<float[]> embedBatch(List<String> texts) {
-        return embeddingModel.embedAll(texts).content().stream()
-                .map(emb -> toFloatArray(emb.vectorAsList()))
-                .toList();
-    }
+    /** 预留批量接口，当前 LangChain4j 1.x 版本嵌入API待适配 */
 
     /**
      * 获取向量维度。

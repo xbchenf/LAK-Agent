@@ -2,8 +2,10 @@ package com.lak.ai.service.rag.retriever;
 
 import com.lak.ai.model.bo.RagFragment;
 import com.lak.ai.service.rag.embedding.EmbeddingService;
+import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
+import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,8 +44,17 @@ public class HybridRetriever {
     public List<RagFragment> search(String query, String collection) {
         try {
             // Phase 1: Dense 向量检索
-            List<EmbeddingMatch<TextSegment>> matches = embeddingStore.findRelevant(
-                    query, DENSE_TOP_K);
+            float[] queryVector = embeddingService.embed(query);
+            List<Float> floatList = new ArrayList<>(queryVector.length);
+            for (float v : queryVector) floatList.add(v);
+            Embedding queryEmbedding = Embedding.from(floatList);
+            List<EmbeddingMatch<TextSegment>> matches = embeddingStore.search(
+                    EmbeddingSearchRequest.builder()
+                            .queryEmbedding(queryEmbedding)
+                            .maxResults(DENSE_TOP_K)
+                            .minScore(SIMILARITY_THRESHOLD)
+                            .build()
+            ).matches();
 
             // Phase 2: 关键词加权 + 相似度过滤
             List<RagFragment> fragments = matches.stream()
@@ -96,9 +107,11 @@ public class HybridRetriever {
 
     private RagFragment toFragment(EmbeddingMatch<TextSegment> match) {
         TextSegment segment = match.embedded();
-        Map<String, String> metadata = segment.metadata() != null
+        Map<String, Object> metadataMap = segment.metadata() != null
                 ? new HashMap<>(segment.metadata().toMap())
                 : Collections.emptyMap();
+        Map<String, String> metadata = new HashMap<>();
+        metadataMap.forEach((k, v) -> metadata.put(k, v != null ? v.toString() : ""));
 
         return RagFragment.builder()
                 .text(segment.text())
