@@ -26,3 +26,7 @@ Thumbs.db
 
 # === Docker volumes ===
 docker/data/
+
+# === Harness audit logs ===
+.claude/hook-logs/*.log
+.claude/hook-logs/*.txt

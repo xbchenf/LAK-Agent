@@ -1,0 +1,73 @@
+{
+  "_说明": "LAK-Agent Harness 基线配置。开发环境宽松覆盖见 settings.dev.json。",
+
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(mvn *)",
+      "Bash(java *)",
+      "Bash(javac *)",
+      "Bash(docker *)",
+      "Bash(curl *)",
+      "Bash(mkdir *)",
+      "Bash(echo *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(rm src/*)",
+      "Bash(touch *)"
+    ],
+    "deny": [
+      "Bash(rm -rf / *)",
+      "Bash(shutdown *)",
+      "Bash(reboot *)",
+      "Bash(chmod 777 *)",
+      "Bash(:(){ :|:& };:)",
+      "Bash(> /dev/sda *)",
+      "Bash(mkfs.*)",
+      "Bash(dd if=*)",
+      "Bash(git push *main*)",
+      "Bash(git push *master*)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{
+          "type": "command",
+          "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/block-dangerous.sh\""
+        }]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [{
+          "type": "command",
+          "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-secrets.sh\""
+        }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [{
+          "type": "command",
+          "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/audit-tool-log.sh\""
+        }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{
+          "type": "command",
+          "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/audit-tool-log.sh\""
+        }]
+      }
+    ]
+  },
+
+  "enableAllProjectMcpServers": true,
+  "ignoreMcpServerHealth": ["filesystem"]
+}
