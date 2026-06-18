@@ -28,8 +28,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthException(AuthException e) {
         log.warn("认证异常, code={}, message={}", e.getCode(), e.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        HttpStatus status = mapAuthHttpStatus(e.getCode());
+        return ResponseEntity.status(status)
                 .body(ApiResponse.error(e.getCode(), e.getMessage()));
+    }
+
+    private HttpStatus mapAuthHttpStatus(int code) {
+        // LAK-01-003: 账户已禁用 → 403 Forbidden
+        if (code == 1_003) return HttpStatus.FORBIDDEN;
+        // LAK-01-004/005: 验证码错误/过期 → 400 Bad Request
+        if (code == 1_004 || code == 1_005) return HttpStatus.BAD_REQUEST;
+        // 其余认证异常 → 401 Unauthorized
+        return HttpStatus.UNAUTHORIZED;
     }
 
     @ExceptionHandler(SensitiveWordException.class)

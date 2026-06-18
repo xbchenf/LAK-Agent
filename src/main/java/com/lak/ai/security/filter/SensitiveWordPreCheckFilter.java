@@ -8,6 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
+import org.springframework.core.io.ClassPathResource;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -22,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 敏感词前置校验 — 用户输入拦截。
  * <p>
  * Filter Chain order=1（最先执行，安全优先于一切业务逻辑）。
- * 敏感词库存储在配置文件中，支持运行时通过管理接口热加载。
+ * 敏感词库存储在配置文件中，启动时自动加载，支持运行时通过管理接口热加载。
  */
 @Slf4j
 @Component
@@ -30,6 +33,20 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SensitiveWordPreCheckFilter implements Filter {
 
     private volatile Set<String> sensitiveWords = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    /**
+     * 启动时自动加载敏感词库。
+     */
+    @PostConstruct
+    public void init() {
+        try {
+            ClassPathResource resource = new ClassPathResource("config/sensitive-words.txt");
+            Path path = resource.getFile().toPath();
+            reload(path);
+        } catch (IOException e) {
+            log.warn("敏感词库启动加载失败, 将以空词库运行", e);
+        }
+    }
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)

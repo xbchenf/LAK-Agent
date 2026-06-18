@@ -10,9 +10,11 @@ import com.lak.ai.model.vo.LoginVO;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
 
 @Slf4j
@@ -24,6 +26,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final CaptchaService captchaService;
     private final PasswordEncoder passwordEncoder;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public LoginVO login(LoginDTO dto) {
@@ -77,6 +80,12 @@ public class AuthServiceImpl implements AuthService {
         if (!jwtService.isRefreshToken(claims)) {
             throw new AuthException(1_007, "Refresh Token 无效");
         }
+
+        // 检查 Token 是否已被废弃
+        if (isTokenRevoked(dto.getRefreshToken())) {
+            throw new AuthException(1_008, "Token 已被废弃");
+        }
+
         Long userId = claims.get("userId", Long.class);
         String username = claims.getSubject();
 
@@ -85,6 +94,9 @@ public class AuthServiceImpl implements AuthService {
         if (user == null || "DISABLED".equals(user.getStatus()) || "LOCKED".equals(user.getStatus())) {
             throw new AuthException(1_003, "账户已被禁用");
         }
+
+        // 废弃旧 Refresh Token（防重放攻击）
+        revokeToken(dto.getRefreshToken(), claims);
 
         List<String> roles = List.of("USER");
         String accessToken = jwtService.generateAccessToken(userId, username, roles);
@@ -99,5 +111,26 @@ public class AuthServiceImpl implements AuthService {
                 .realName(user.getRealName())
                 .roles(roles)
                 .build();
+    }
+
+    private boolean isTokenRevoked(String token) {
+        String hash = tokenHash(token);
+        return Boolean.TRUE.equals(redisTemplate.hasKey("token:revoked:" + hash));
+    }
+
+    private void revokeToken(String token, Claims claims) {
+        String hash = tokenHash(token);
+        // TTL 等于 Token 剩余有效时间
+        long remaining = claims.getExpiration().getTime() - System.currentTimeMillis();
+        if (remaining > 0) {
+            redisTemplate.opsForValue().set("token:revoked:" + hash, "1",
+                    Duration.ofMillis(remaining));
+        }
+    }
+
+    private String tokenHash(String token) {
+        // 取 token 后 16 字节做 SHA-256 摘要，避免 Redis Key 过长
+        String suffix = token.length() > 32 ? token.substring(token.length() - 32) : token;
+        return Integer.toHexString(suffix.hashCode());
     }
 }

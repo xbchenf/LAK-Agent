@@ -60,16 +60,23 @@ public class ContextWindow {
      */
     public String buildPromptContext(String sessionId) {
         List<ContextMessage> context = load(sessionId);
-        StringBuilder sb = new StringBuilder();
+        // 从最新到最旧累积，超出上限丢弃最早的消息
+        List<ContextMessage> selected = new ArrayList<>();
         int estimatedTokens = 0;
-        // 从最早到最新
-        for (ContextMessage msg : context) {
+        for (int i = context.size() - 1; i >= 0; i--) {
+            ContextMessage msg = context.get(i);
             int msgTokens = estimateTokens(msg.getContent());
             if (estimatedTokens + msgTokens > MAX_TOKENS) {
-                break; // 超出上限，丢弃更早的消息
+                break; // 丢弃剩余（更早的）消息
             }
-            sb.append(msg.getRole()).append(": ").append(msg.getContent()).append("\n");
+            selected.add(msg);
             estimatedTokens += msgTokens;
+        }
+        // 恢复时间正序
+        java.util.Collections.reverse(selected);
+        StringBuilder sb = new StringBuilder();
+        for (ContextMessage msg : selected) {
+            sb.append(msg.getRole()).append(": ").append(msg.getContent()).append("\n");
         }
         return sb.toString();
     }

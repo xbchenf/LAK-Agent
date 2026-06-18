@@ -105,7 +105,7 @@ mybatis-plus:
 # ---- LAK 项目自定义配置 ----
 lak:
   jwt:
-    secret: ${JWT_SECRET:lak-ai-platform-default-secret-change-in-production}
+    secret: ${JWT_SECRET}
     access-token-expiration: 7200
     refresh-token-expiration: 604800
   session:

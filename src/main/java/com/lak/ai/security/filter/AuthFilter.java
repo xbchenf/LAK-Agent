@@ -41,7 +41,7 @@ public class AuthFilter implements Filter {
             "/api/v1/auth/refresh"
     );
 
-    @Value("${lak.jwt.secret:lak-ai-platform-default-secret-change-in-production}")
+    @Value("${lak.jwt.secret}")
     private String jwtSecret;
 
     @Override
