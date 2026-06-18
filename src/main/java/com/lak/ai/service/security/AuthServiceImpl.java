@@ -82,7 +82,7 @@ public class AuthServiceImpl implements AuthService {
 
         // 查询用户确认状态
         SysUser user = sysUserMapper.selectById(userId);
-        if (user == null || "DISABLED".equals(user.getStatus())) {
+        if (user == null || "DISABLED".equals(user.getStatus()) || "LOCKED".equals(user.getStatus())) {
             throw new AuthException(1_003, "账户已被禁用");
         }
 

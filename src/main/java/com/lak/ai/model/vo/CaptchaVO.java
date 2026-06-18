@@ -9,6 +9,7 @@ public class CaptchaVO {
 
     private String captchaKey;
 
-    /** 开发环境返回明文，生产环境应为 base64 图片 */
+    /** 生产环境应替换为 base64 PNG 图片，开发环境暂用明文 */
+    @Deprecated
     private String captchaText;
 }

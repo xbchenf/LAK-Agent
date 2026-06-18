@@ -31,24 +31,28 @@ public class AuditLog implements Serializable {
     private String sessionId;
     @TableField("user_id")
     private Long userId;
+    @ToString.Exclude
     @TableField("request_body")
     private String requestBody;
+    @ToString.Exclude
     @TableField("response_body")
     private String responseBody;
     @TableField("intent_type")
     private String intentType;
     private BigDecimal confidence;
-    /** JSON — 大模型调用参数 */
+    @ToString.Exclude
     @TableField("model_params")
     private String modelParams;
+    @ToString.Exclude
     @TableField("model_response")
     private String modelResponse;
-    /** JSON — RAG 检索召回片段 */
+    @ToString.Exclude
     @TableField("retrieval_fragments")
     private String retrievalFragments;
     @TableField("latency_ms")
     private Integer latencyMs;
     private String status;
+    @ToString.Exclude
     @TableField("error_message")
     private String errorMessage;
 

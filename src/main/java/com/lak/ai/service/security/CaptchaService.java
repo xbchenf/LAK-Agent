@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -26,7 +27,7 @@ public class CaptchaService {
      */
     public CaptchaResult generate() {
         String key = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        String code = String.format("%04d", (int) (Math.random() * 10000));
+        String code = String.format("%04d", new SecureRandom().nextInt(10000));
         redisTemplate.opsForValue().set(CAPTCHA_PREFIX + key, code, CAPTCHA_TTL_SECONDS, TimeUnit.SECONDS);
         return new CaptchaResult(key, code);
     }

@@ -22,7 +22,7 @@ public class JwtService {
     private final long refreshExpiration;
 
     public JwtService(
-            @Value("${lak.jwt.secret:lak-ai-platform-default-secret-change-in-production}") String secret,
+            @Value("${lak.jwt.secret}") String secret,
             @Value("${lak.jwt.access-token-expiration:7200}") long accessExpiration,
             @Value("${lak.jwt.refresh-token-expiration:604800}") long refreshExpiration) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));

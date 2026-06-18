@@ -32,13 +32,16 @@ public class AuthController {
 
     /**
      * 获取验证码 — GET /api/v1/auth/captcha
+     * <p>
+     * 开发环境返回 captchaKey + 明文 captchaText（前端直接展示）。
+     * 生产环境必须替换为 captchaKey + base64 PNG 图片，禁止返回明文验证码。
      */
     @GetMapping("/captcha")
     public ApiResponse<CaptchaVO> captcha() {
         CaptchaService.CaptchaResult result = captchaService.generate();
         CaptchaVO vo = CaptchaVO.builder()
                 .captchaKey(result.key())
-                .captchaText(result.code())
+                .captchaText(result.code())  // TODO: 生产环境替换为 base64 图片
                 .build();
         return ApiResponse.success(vo);
     }
