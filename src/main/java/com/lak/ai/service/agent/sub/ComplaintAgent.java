@@ -87,7 +87,7 @@ public class ComplaintAgent implements SubAgent {
             if (result.slotValues() != null && !result.slotValues().isEmpty()) {
                 // 所有槽位填充完成 → 创建工单（Step 8 实现 TicketAdapter）
                 Map<String, String> slots = result.slotValues();
-                log.info("投诉信息采集完成, sessionId={}, slots={}", sessionId, slots);
+                log.info("投诉信息采集完成, sessionId={}, slotCount={}", sessionId, slots.size());
                 return AgentResponse.builder()
                         .answer("您的诉求已受理，我们会尽快处理。如有需要，请留意您提供的联系方式。")
                         .confidence(1.0)
