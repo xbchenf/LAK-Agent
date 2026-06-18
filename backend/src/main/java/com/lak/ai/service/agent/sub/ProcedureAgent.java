@@ -8,15 +8,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 办事指引 Agent — 委托给 @AiService(ProcedureAgentService) 实现 LLM 自主检索+生成。
+ * 办事指引 Agent — 强制两步：代码检索 + LLM 生成。
  */
 @Slf4j
 @Component
 public class ProcedureAgent implements SubAgent {
 
     private final ProcedureAgentService agentService;
+    private final ProcedureAgentTools tools;
 
-    public ProcedureAgent(ProcedureAgentService agentService) { this.agentService = agentService; }
+    public ProcedureAgent(ProcedureAgentService agentService, ProcedureAgentTools tools) {
+        this.agentService = agentService;
+        this.tools = tools;
+    }
 
     @Override public String getAgentId() { return "agent-procedure"; }
     @Override public String getAgentName() { return "办事指引Agent"; }
@@ -25,7 +29,10 @@ public class ProcedureAgent implements SubAgent {
     @Override
     public AgentResponse process(AgentRequest request) {
         try {
-            String answer = agentService.answer(request.getMessage());
+            // Step 1: 强制检索（代码层面，不依赖 LLM）
+            String docs = tools.search(request.getMessage());
+            // Step 2: LLM 基于检索资料生成（检索结果注入 Prompt）
+            String answer = agentService.answer(request.getMessage(), docs);
             return AgentResponse.builder().answer(answer).confidence(0.9)
                     .intentType(IntentType.PROCEDURE_GUIDE.name()).build();
         } catch (Exception e) {

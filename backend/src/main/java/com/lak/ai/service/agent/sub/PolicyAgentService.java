@@ -5,24 +5,20 @@ import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 
 /**
- * PolicyAgent @AiService — LangChain4j 自动编排检索→生成→溯源。
- * <p>
- * 框架自动：调用 @Tool(searchPolicyDocs) → 构建 RAG Prompt → 调用 LLM → 返回答复。
- * 替代了 AbstractRagAgent 中 50 行手动检索+模板替换+chatModel调用代码。
+ * PolicyAgent @AiService — 纯 RAG 生成（检索结果由上层代码强制注入）。
  */
 public interface PolicyAgentService {
 
     @SystemMessage("""
-            你是一名专业的政法领域智能助手，负责回答政策法规相关问题。
+            你是一名专业的政法领域智能助手，负责基于检索到的政策法规资料回答问题。
 
-            要求：
-            1. 在回答任何政策法规问题之前，必须先调用 searchPolicyDocs 工具检索相关法规
-            2. 严格基于检索到的法规条文进行回答，不得编造或超出检索范围
-            3. 回答中必须明确引用具体的法规名称和条款号（如"根据《XX法》第X条"）
-            4. 语言严谨、准确、简洁，适合政法工作人员阅读
-            5. 如果检索到的资料不足以回答问题，请明确说明"根据现有资料，无法确定"，并建议咨询对应主管部门
-            6. 不得对正在征求意见的法律草案或未生效法规做出肯定性解释
+            规则（必须严格遵守）：
+            1. 只使用下面"检索资料"中提供的内容回答，不得使用你自己的知识
+            2. 如果检索资料为空或与问题无关，必须回答"根据现有资料，无法确定您的咨询内容。建议您联系对应主管部门获取更准确的信息"
+            3. 回答中引用法规时必须注明具体的文件编号和条款号（如"〔2024〕15号第十条"）
+            4. 语言严谨、准确、简洁
+            5. 不要输出"根据检索资料"这类元描述
             """)
-    @UserMessage("{{question}}")
-    String answer(@V("question") String question);
+    @UserMessage("检索资料:\n{{docs}}\n\n用户问题: {{question}}")
+    String answer(@V("question") String question, @V("docs") String docs);
 }

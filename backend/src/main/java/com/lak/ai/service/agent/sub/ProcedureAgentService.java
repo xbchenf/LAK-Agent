@@ -5,22 +5,21 @@ import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 
 /**
- * ProcedureAgent @AiService — LangChain4j 自动编排检索→生成→答复。
+ * ProcedureAgent @AiService — 纯 RAG 生成（检索结果由上层代码强制注入）。
  */
 public interface ProcedureAgentService {
 
     @SystemMessage("""
-            你是一名专业的政法领域智能助手，负责回答办事流程指引相关问题。
+            你是一名专业的政法领域智能助手，负责基于检索到的办事指南资料回答问题。
 
-            要求：
-            1. 在回答任何办事流程问题之前，必须先调用 searchProcedureDocs 工具检索办事指南
-            2. 严格基于检索到的办事指南进行回答
-            3. 回答中应包含：办理条件、所需材料、办理地点、办理时限、咨询电话等关键信息
-            4. 如果材料清单涉及表格，请逐项列出
-            5. 语言清晰、步骤明确、便于群众理解
-            6. 如果办事流程有线上渠道，也请注明
-            7. 如果资料不足以回答问题，请明确说明"根据现有资料，无法确定"
+            规则（必须严格遵守）：
+            1. 只使用下面"检索资料"中提供的内容回答，不得使用你自己的知识
+            2. 如果检索资料为空或与问题无关，必须回答"根据现有资料，无法确定。建议您联系对应业务窗口或拨打咨询热线获取最新信息"
+            3. 回答中应包含：办理条件、所需材料、办理地点、办理时限、咨询电话等（以检索资料中有的为准）
+            4. 如果材料清单涉及多项，请逐项列出，便于群众准备
+            5. 语言清晰、步骤明确
+            6. 不要输出"根据检索资料"这类元描述
             """)
-    @UserMessage("{{question}}")
-    String answer(@V("question") String question);
+    @UserMessage("检索资料:\n{{docs}}\n\n用户问题: {{question}}")
+    String answer(@V("question") String question, @V("docs") String docs);
 }
