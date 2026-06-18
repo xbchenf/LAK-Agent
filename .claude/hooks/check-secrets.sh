@@ -2,7 +2,7 @@
 # =============================================================================
 # Hook: PreToolUse (matcher: "Write|Edit")
 # 用途: 在写文件前检查是否包含敏感信息
-# LAK-Agent 定制: 检测百炼 API Key / JWT Secret / 数据库密码 / BCrypt 硬编码
+# LAK-Agent 定制: 检测百炼 API Key / JWT Secret / 数据库密码硬编码
 # =============================================================================
 
 LOG_DIR="${CLAUDE_PROJECT_DIR}/.claude/hook-logs"
@@ -27,31 +27,38 @@ FILE_PATH=$("$PYTHON" -c "
 import sys, json
 data = json.load(sys.stdin)
 ti = data.get('tool_input', {})
-# Edit 用 file_path, Write 也用 file_path
 print(ti.get('file_path', ''))
 " <<< "$PAYLOAD" 2>/dev/null)
 
-# 只检查 Java / YAML / properties 文件
-if ! echo "$FILE_PATH" | grep -Eq '\.(java|yml|yaml|properties|xml|json)$'; then
-  exit 0
-fi
+# 排除二进制文件和非文本扩展名，其余全部扫描
+EXT="${FILE_PATH##*.}"
+case "$EXT" in
+  jar|war|class|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|pdf|zip|tar|gz|xz|7z|exe|dll|so|dylib) exit 0 ;;
+esac
 
 FILE_CONTENT=$("$PYTHON" -c "
 import sys, json
 data = json.load(sys.stdin)
 ti = data.get('tool_input', {})
-# Edit 用 new_string, Write 用 content
 content = ti.get('new_string', ti.get('content', ''))
-# 截取前 5000 字符检查
 print(content[:5000])
 " <<< "$PAYLOAD" 2>/dev/null)
 
 # =============================================================================
-# 敏感信息检测规则
+# 敏感信息检测 — 全部用 Python 做（跨平台，避免 grep -P 兼容性问题）
 # =============================================================================
+BLOCKED=false
 
-# 百炼 API Key 模式
-if echo "$FILE_CONTENT" | grep -Eq 'DASHSCOPE_API_KEY["\s:]*["\s:][a-zA-Z0-9_-]{20,}'; then
+# 百炼 API Key — 匹配 = / : 赋值，含引号
+if echo "$FILE_CONTENT" | "$PYTHON" -c "
+import sys
+import re
+content = sys.stdin.read()
+if re.search(r'DASHSCOPE_API_KEY\s*[:=]\s*[\"\\x27]?[a-zA-Z0-9_\-\.]{20,}', content):
+    sys.exit(1)
+" 2>/dev/null; then
+  :
+else
   echo "[$TIMESTAMP] SECRET-BLOCKED: DASHSCOPE_API_KEY hardcoded in $FILE_PATH" >> "$LOG_DIR/blocked-secrets.log"
   echo "==============================================" >&2
   echo " [安全拦截] 检测到 百炼 API Key 硬编码!" >&2
@@ -61,8 +68,15 @@ if echo "$FILE_CONTENT" | grep -Eq 'DASHSCOPE_API_KEY["\s:]*["\s:][a-zA-Z0-9_-]{
   exit 1
 fi
 
-# JWT Secret 模式
-if echo "$FILE_CONTENT" | grep -Eq 'JWT_SECRET["\s:]*["\s:][a-zA-Z0-9_-]{20,}'; then
+# JWT Secret
+if echo "$FILE_CONTENT" | "$PYTHON" -c "
+import sys, re
+content = sys.stdin.read()
+if re.search(r'JWT_SECRET\s*[:=]\s*[\"\\x27]?[a-zA-Z0-9_\-\.]{20,}', content):
+    sys.exit(1)
+" 2>/dev/null; then
+  :
+else
   echo "[$TIMESTAMP] SECRET-BLOCKED: JWT_SECRET hardcoded in $FILE_PATH" >> "$LOG_DIR/blocked-secrets.log"
   echo "==============================================" >&2
   echo " [安全拦截] 检测到 JWT Secret 硬编码!" >&2
@@ -72,9 +86,22 @@ if echo "$FILE_CONTENT" | grep -Eq 'JWT_SECRET["\s:]*["\s:][a-zA-Z0-9_-]{20,}'; 
   exit 1
 fi
 
-# 数据库密码模式（排除 localhost/dev 注释）
-if echo "$FILE_CONTENT" | grep -qP '(?<!localhost.*)(?<!dev.*)(password|MYSQL_PASSWORD)\s*[:=]\s*["\x27][^$][^"'\x27]{3,}["\x27]' 2>/dev/null; then
-  echo "[$TIMESTAMP] SECRET-WARN: possible password hardcoded in $FILE_PATH" >> "$LOG_DIR/blocked-secrets.log"
-fi
+# 数据库密码 — 硬编码明文密码
+echo "$FILE_CONTENT" | "$PYTHON" -c "
+import sys, re
+content = sys.stdin.read()
+# 匹配 password/secret 赋值，排除环境变量引用 \${
+matches = re.findall(r'(?:password|passwd|MYSQL_PASSWORD|secret)\s*[:=]\s*[\"\\x27](?!.*\$\{)([^\"\\x27]{4,})[\"\\x27]', content, re.IGNORECASE)
+if matches:
+    for m in matches:
+        if not m.startswith('\${') and m not in ('localhost', 'dev-password', 'changeme', 'your-password'):
+            sys.exit(1)
+" 2>/dev/null && exit 0
 
-exit 0
+echo "[$TIMESTAMP] SECRET-BLOCKED: password hardcoded in $FILE_PATH" >> "$LOG_DIR/blocked-secrets.log"
+echo "==============================================" >&2
+echo " [安全拦截] 检测到数据库密码硬编码!" >&2
+echo " 文件: $FILE_PATH" >&2
+echo " 密码必须通过环境变量注入（\${MYSQL_PASSWORD}）" >&2
+echo "==============================================" >&2
+exit 1

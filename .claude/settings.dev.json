@@ -30,9 +30,16 @@
       "Bash(rm -rf /tmp/*)",
       "Bash(shutdown *)",
       "Bash(reboot *)",
+      "Bash(chmod 777 *)",
+      "Bash(:(){ :|:& };:)",
+      "Bash(> /dev/*)",
+      "Bash(mkfs.*)",
+      "Bash(dd if=*)",
+      "Bash(npm publish *)",
       "Bash(git push *main*)",
       "Bash(git push *master*)",
-      "Bash(git push --force *)"
+      "Bash(git push --force *)",
+      "Bash(git push -f *)"
     ]
   },
 

@@ -70,6 +70,7 @@
     ]
   },
 
-  "enableAllProjectMcpServers": true,
+  "enableAllProjectMcpServers": false,
+  "mcpServerAllowlist": [],
   "ignoreMcpServerHealth": ["filesystem"]
 }

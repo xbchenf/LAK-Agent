@@ -40,9 +40,11 @@ LV1_PATTERNS=(
   "TRUNCATE\s+(TABLE\s+)?"
   "DELETE\s+FROM\s+\w+\s*[^W]"            # DELETE FROM 但后面没有 WHERE
   "DELETE\s+FROM\s+\w+\s*$"              # DELETE FROM 行尾
+  "DELETE\s+FROM\s+\w+\s+WHERE\s+(1\s*=\s*1|true)\b"  # DELETE ... WHERE 1=1 绕过
   "DELETE\s+FROM\s+audit_log"            # 审计日志禁止删除
   "ALTER\s+TABLE\s+\w+\s+DROP\s+COLUMN"
   "UPDATE\s+\w+\s+SET\s+.*[^W]$"         # UPDATE 无 WHERE
+  "UPDATE\s+\w+\s+SET\s+.*WHERE\s+(1\s*=\s*1|true)\b"  # UPDATE ... WHERE 1=1 绕过
   "RENAME\s+TABLE"
   "GRANT\s+ALL"                          # 禁止 GRANT ALL
 )
