@@ -41,8 +41,20 @@ public class SensitiveWordPreCheckFilter implements Filter {
     public void init() {
         try {
             ClassPathResource resource = new ClassPathResource("config/sensitive-words.txt");
-            Path path = resource.getFile().toPath();
-            reload(path);
+            // JAR内运行时getFile()不可用，改为getInputStream()
+            Set<String> words = ConcurrentHashMap.newKeySet();
+            try (var reader = new BufferedReader(
+                    new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String trimmed = line.trim();
+                    if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+                        words.add(trimmed);
+                    }
+                }
+            }
+            this.sensitiveWords = words;
+            log.info("敏感词库启动加载完成, count={}", words.size());
         } catch (IOException e) {
             log.warn("敏感词库启动加载失败, 将以空词库运行", e);
         }

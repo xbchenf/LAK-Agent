@@ -1,7 +1,7 @@
 package com.lak.ai.service.rag.embedding;
 
-import dev.langchain4j.community.model.dashscope.QwenEmbeddingModel;
 import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class EmbeddingService {
 
-    private final QwenEmbeddingModel embeddingModel;
+    private final EmbeddingModel embeddingModel;
 
     /**
      * 将单个文本转换为 Dense Vector。
