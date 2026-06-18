@@ -25,7 +25,9 @@
       "Bash(tail *)"
     ],
     "deny": [
-      "Bash(rm -rf / *)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)",
+      "Bash(rm -rf /tmp/*)",
       "Bash(shutdown *)",
       "Bash(reboot *)",
       "Bash(git push *main*)",
