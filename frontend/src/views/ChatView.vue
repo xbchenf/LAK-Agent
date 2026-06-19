@@ -77,14 +77,30 @@ watch(() => chat.messages.length, scrollBottom)
 </template>
 
 <style scoped>
-.chat-view { display: flex; flex-direction: column; height: calc(100vh - 80px); }
-.messages { flex: 1; overflow-y: auto; padding: 16px; }
-.message { margin-bottom: 16px; display: flex; }
+.chat-view { display: flex; flex-direction: column; height: 100vh; }
+.messages { flex: 1; overflow-y: auto; padding: 24px; max-width: 900px; margin: 0 auto; width: 100%; }
+.message { margin-bottom: 20px; display: flex; }
 .message.user { justify-content: flex-end; }
-.message.user .bubble { background: #ecf5ff; border-radius: 12px 12px 0 12px; }
-.message.assistant .bubble { background: #f5f7fa; border-radius: 12px 12px 12px 0; }
-.bubble { max-width: 75%; padding: 12px 16px; }
-.cursor { animation: blink 1s infinite; }
+.message.user .bubble {
+  background: var(--color-primary); color: #fff;
+  border-radius: 16px 16px 4px 16px;
+}
+.message.assistant .bubble {
+  background: var(--color-bg-white);
+  border-radius: 16px 16px 16px 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.bubble { max-width: 75%; padding: 14px 18px; line-height: 1.7; font-size: 14px; white-space: pre-wrap; }
+.cursor { animation: blink 1s infinite; color: var(--color-accent); }
 @keyframes blink { 50% { opacity: 0; } }
-.input-area { padding: 12px 16px; border-top: 1px solid #ebeef5; background: white; }
+.input-area {
+  padding: 16px 24px; background: var(--color-bg-white);
+  border-top: 1px solid var(--color-border);
+}
+.input-area :deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px var(--color-border); border-radius: 24px; padding: 4px 16px;
+}
+.input-area :deep(.el-input-group__append) {
+  background: var(--color-primary); border: none; border-radius: 0 24px 24px 0; color: #fff;
+}
 </style>

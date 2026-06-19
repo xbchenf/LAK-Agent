@@ -79,10 +79,34 @@ fetchCaptcha()
 </template>
 
 <style scoped>
-.login-page { display: flex; align-items: center; justify-content: center; height: 100vh; background: #f5f7fa; }
-.login-card { width: 400px; }
-.login-card h2 { text-align: center; margin-bottom: 24px; }
+.login-page {
+  display: flex; align-items: center; justify-content: center; height: 100vh;
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 50%, #2c5f8a 100%);
+  position: relative;
+}
+.login-page::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 20% 80%, rgba(201,168,76,0.1) 0%, transparent 50%),
+              radial-gradient(circle at 80% 20%, rgba(255,255,255,0.05) 0%, transparent 50%);
+}
+.login-card {
+  width: 400px; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  position: relative; z-index: 1;
+}
+.login-card :deep(.el-card__body) { padding: 40px 36px; }
+.login-card h2 {
+  text-align: center; margin-bottom: 32px; font-size: 22px;
+  color: var(--color-primary); letter-spacing: 2px;
+}
+.login-card h2::after {
+  content: ''; display: block; width: 40px; height: 3px;
+  background: var(--color-accent); margin: 12px auto 0; border-radius: 2px;
+}
 .captcha-row { display: flex; gap: 8px; width: 100%; }
-.captcha-btn { min-width: 110px; letter-spacing: 4px; font-weight: bold; }
-.submit-btn { width: 100%; }
+.captcha-btn {
+  min-width: 110px; letter-spacing: 4px; font-weight: bold;
+  background: var(--color-primary); color: #fff; border: none;
+}
+.captcha-btn:hover { background: var(--color-primary-light); }
+.submit-btn { width: 100%; height: 44px; font-size: 16px; letter-spacing: 4px; }
 </style>
