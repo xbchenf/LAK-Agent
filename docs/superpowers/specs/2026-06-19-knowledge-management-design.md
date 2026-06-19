@@ -377,9 +377,9 @@ ALTER TABLE knowledge_document ADD INDEX idx_doc_type_status (doc_type, status);
 
 | 问题 | 修复方式 |
 |------|---------|
-| `QdrantCollectionInitializer` 用 1024 维，应为 1536 | 改为读取 RagConstants 常量 |
+| `RagConstants.EMBEDDING_DIMENSION` 和 `EmbeddingService.dimension()` 写死 1536，实际模型返回 1024 | 统一改为 1024；`EmbeddingService.dimension()` 从实际返回值动态获取 |
 | `TestDataLoader` 每次启动重复加载 6 份测试数据 | 改为检测 Qdrant 已有数据则跳过 |
-| `DataIngestionService` 硬编码文件目录读取 | 重构为通过 `FileStorageService` 和 `DocumentParser` 接口 |
+| `DataIngestionService` 硬编码文件目录读取 | 重构为通过 `LocalFileStorageService` 和 `DocumentParser` |
 
 ---
 
