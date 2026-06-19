@@ -27,6 +27,12 @@ function switchSession(sid: string) {
 
 function newChat() {
   chat.clearMessages()
+  router.push('/').then(() => loadSessions())
+}
+
+async function deleteSession(sid: string) {
+  try { await request.delete(`/chat/sessions/${sid}`) } catch { /* */ }
+  if (chat.currentSessionId === sid) { chat.clearMessages() }
   loadSessions()
 }
 
@@ -46,13 +52,13 @@ const intentLabel: Record<string, string> = {
       </div>
 
       <nav class="sidebar-nav">
-        <a class="nav-item" :class="{ active: route.path === '/' }" @click="newChat(); router.push('/')">💬 智能问答</a>
+        <a class="nav-item new-chat" @click="newChat()">＋ 新建对话</a>
+        <a class="nav-item" :class="{ active: route.path === '/' }" @click="router.push('/')">💬 智能问答</a>
         <a class="nav-item" :class="{ active: route.path === '/tickets' }" @click="router.push('/tickets')">📋 投诉建议</a>
         <a v-if="auth.roles?.includes('ADMIN')" class="nav-item"
            :class="{ active: route.path === '/admin' }" @click="router.push('/admin')">⚙ 系统管理</a>
       </nav>
 
-      <!-- 历史会话 -->
       <div class="session-list" v-if="sessions.length">
         <div class="session-title">历史会话</div>
         <div v-for="s in sessions" :key="s.sessionId" class="session-item"
@@ -60,6 +66,7 @@ const intentLabel: Record<string, string> = {
              @click="switchSession(s.sessionId); router.push('/')">
           <span class="s-icon">{{ intentLabel[s.intentType] || '💬' }}</span>
           <span class="s-text">{{ s.createTime?.substring(5,16) || '' }}</span>
+          <span class="s-del" @click.stop="deleteSession(s.sessionId)">×</span>
         </div>
       </div>
 
@@ -107,8 +114,15 @@ const intentLabel: Record<string, string> = {
 }
 .session-item:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.9); }
 .session-item.active { background: rgba(255,255,255,0.12); color: #fff; }
-.s-icon { font-size: 14px; }
-.s-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.s-icon { font-size: 14px; flex-shrink: 0; }
+.s-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.s-del {
+  opacity: 0; font-size: 16px; color: rgba(255,255,255,0.4);
+  padding: 0 4px; transition: opacity 0.15s;
+}
+.session-item:hover .s-del { opacity: 1; }
+.s-del:hover { color: var(--color-danger); }
+.new-chat { color: var(--color-accent) !important; font-weight: 500; }
 
 .sidebar-footer {
   padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.1);
