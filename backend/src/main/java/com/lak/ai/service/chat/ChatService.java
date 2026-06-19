@@ -53,7 +53,6 @@ public class ChatService {
         if (!sessionManager.isActive(sessionId)) return ChatResult.error("会话不存在或已关闭");
 
         List<ContextMessage> context = contextWindow.getContext(sessionId);
-        contextWindow.append(sessionId, "user", message); // 保存用户消息到上下文
         AgentRequest request = AgentRequest.builder().sessionId(sessionId).userId(userId)
                 .message(message).context(context).build();
 
@@ -126,12 +125,12 @@ public class ChatService {
                     stream.onPartialResponse(t -> { answerBuf.append(t); safeSend(emitter, t); })
                           .onCompleteResponse(c -> {
                               safeSendDone(emitter, sid, intentName); emitter.complete();
-                              String full = answerBuf.toString();
-                              appendToContext(sid, "assistant", full);
-                              AgentResponse tr = AgentResponse.builder().answer(full).build();
-                              if (!validator.validate(tr, null))
-                                  log.warn("SSE流式答复合规校验未通过, sessionId={}", sid);
-                          }).onError(e -> emitter.completeWithError(e)).start();
+                              saveStreamContext(sid, answerBuf.toString());
+                          }).onError(e -> {
+                              log.error("Stream error", e);
+                              saveStreamContext(sid, answerBuf.toString());
+                              emitter.completeWithError(e);
+                          }).start();
                     return;
                 }
                 if (decision.getIntentType() == IntentType.PROCEDURE_GUIDE) {
@@ -139,12 +138,12 @@ public class ChatService {
                     stream.onPartialResponse(t -> { answerBuf.append(t); safeSend(emitter, t); })
                           .onCompleteResponse(c -> {
                               safeSendDone(emitter, sid, intentName); emitter.complete();
-                              String full = answerBuf.toString();
-                              appendToContext(sid, "assistant", full);
-                              AgentResponse tr = AgentResponse.builder().answer(full).build();
-                              if (!validator.validate(tr, null))
-                                  log.warn("SSE流式答复合规校验未通过, sessionId={}", sid);
-                          }).onError(e -> emitter.completeWithError(e)).start();
+                              saveStreamContext(sid, answerBuf.toString());
+                          }).onError(e -> {
+                              log.error("Stream error", e);
+                              saveStreamContext(sid, answerBuf.toString());
+                              emitter.completeWithError(e);
+                          }).start();
                     return;
                 }
 
@@ -170,6 +169,13 @@ public class ChatService {
         }).start();
 
         return emitter;
+    }
+
+    private void saveStreamContext(String sid, String fullAnswer) {
+        appendToContext(sid, "assistant", fullAnswer);
+        AgentResponse tr = AgentResponse.builder().answer(fullAnswer).build();
+        if (!validator.validate(tr, null))
+            log.warn("SSE流式答复合规校验未通过, sessionId={}", sid);
     }
 
     private void safeSend(SseEmitter e, String data) {
