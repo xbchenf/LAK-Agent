@@ -53,6 +53,7 @@ public class ChatService {
         if (!sessionManager.isActive(sessionId)) return ChatResult.error("会话不存在或已关闭");
 
         List<ContextMessage> context = contextWindow.getContext(sessionId);
+        contextWindow.append(sessionId, "user", message); // 保存用户消息到上下文
         AgentRequest request = AgentRequest.builder().sessionId(sessionId).userId(userId)
                 .message(message).context(context).build();
 
