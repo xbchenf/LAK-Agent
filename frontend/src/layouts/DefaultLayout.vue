@@ -69,22 +69,23 @@ const intentLabel: Record<string, string> = {
       </div>
 
       <nav class="sidebar-nav">
-        <a class="nav-item new-chat" @click="newChat()">＋ 新建对话</a>
         <a class="nav-item" :class="{ active: route.path === '/' }" @click="router.push('/')">💬 智能问答</a>
         <a class="nav-item" :class="{ active: route.path === '/tickets' }" @click="router.push('/tickets')">📋 投诉建议</a>
         <a v-if="auth.roles?.includes('ADMIN')" class="nav-item"
            :class="{ active: route.path === '/admin' }" @click="router.push('/admin')">⚙ 系统管理</a>
       </nav>
 
-      <div class="session-list" v-if="sessions.length">
-        <div class="session-title">历史会话</div>
-        <div v-for="s in sessions" :key="s.sessionId" class="session-item"
-             :class="{ active: s.sessionId === chat.currentSessionId }"
-             @click="switchSession(s.sessionId); router.push('/')">
-          <span class="s-icon">{{ intentLabel[s.intentType] || '💬' }}</span>
-          <span class="s-text">{{ s.createTime?.substring(5,16) || '' }}</span>
-          <span class="s-del" title="删除会话" @click.stop="deleteSession(s.sessionId)">×</span>
-        </div>
+      <div class="session-list">
+        <template v-if="sessions.length">
+          <div class="session-title">历史会话</div>
+          <div v-for="s in sessions" :key="s.sessionId" class="session-item"
+               :class="{ active: s.sessionId === chat.currentSessionId }"
+               @click="switchSession(s.sessionId); router.push('/')">
+            <span class="s-icon">{{ intentLabel[s.intentType] || '💬' }}</span>
+            <span class="s-text">{{ s.createTime?.substring(5,16) || '' }}</span>
+            <span class="s-del" title="删除会话" @click.stop="deleteSession(s.sessionId)">×</span>
+          </div>
+        </template>
       </div>
 
       <div class="sidebar-footer">

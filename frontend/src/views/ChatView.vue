@@ -81,6 +81,9 @@ watch(() => chat.messages.length, scrollBottom)
 
 <template>
   <div class="chat-view">
+    <div class="chat-header">
+      <button class="new-chat-btn" @click="chat.clearMessages()">＋ 新对话</button>
+    </div>
     <div ref="messagesEl" class="messages">
       <div v-for="(msg, i) in chat.messages" :key="i" :class="['message', msg.role]">
         <div class="bubble">
@@ -107,7 +110,14 @@ watch(() => chat.messages.length, scrollBottom)
 </template>
 
 <style scoped>
-.chat-view { display: flex; flex-direction: column; height: 100vh; }
+.chat-view { display: flex; flex-direction: column; height: 100vh; position: relative; }
+.chat-header { padding: 8px 24px; border-bottom: 1px solid var(--color-border-light); background: var(--color-bg-white); }
+.new-chat-btn {
+  background: var(--color-accent); color: #fff; border: none;
+  padding: 6px 16px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500;
+}
+.new-chat-btn:hover { opacity: 0.85; }
 .messages { flex: 1; overflow-y: auto; padding: 24px; max-width: 900px; margin: 0 auto; width: 100%; }
 .message { margin-bottom: 20px; display: flex; }
 .message.user { justify-content: flex-end; }
