@@ -28,7 +28,7 @@ function newChat() { chat.clearMessages() }
           <span class="nav-icon">💬</span> 智能问答
         </a>
         <a class="nav-item" :class="{ active: activeMenu === '/tickets' }" @click="router.push('/tickets')">
-          <span class="nav-icon">📋</span> 工单查询
+          <span class="nav-icon">📋</span> 投诉建议
         </a>
         <a v-if="auth.roles.includes('ADMIN')" class="nav-item"
            :class="{ active: activeMenu === '/admin' }" @click="router.push('/admin')">
