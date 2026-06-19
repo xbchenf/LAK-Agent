@@ -7,7 +7,6 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,7 +24,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class HybridRetriever {
 
     private static final int DENSE_TOP_K = 10;
@@ -33,7 +31,16 @@ public class HybridRetriever {
     private static final double SIMILARITY_THRESHOLD = 0.75;
 
     private final EmbeddingService embeddingService;
-    private final QdrantEmbeddingStore embeddingStore;
+    private final Map<String, QdrantEmbeddingStore> stores;
+
+    public HybridRetriever(EmbeddingService embeddingService,
+            List<QdrantEmbeddingStore> storeList) {
+        this.embeddingService = embeddingService;
+        this.stores = new HashMap<>();
+        for (var store : storeList) {
+            this.stores.put(store.toString().contains("procedure") ? "lak_procedure_docs" : "lak_policy_docs", store);
+        }
+    }
 
     @Value("${lak.rag.retrieval-timeout-seconds:3}")
     private int timeoutSeconds;
@@ -43,12 +50,17 @@ public class HybridRetriever {
      */
     public List<RagFragment> search(String query, String collection) {
         try {
+            QdrantEmbeddingStore store = stores.get(collection);
+            if (store == null) {
+                log.warn("未找到Collection对应的Store, collection={}", collection);
+                return Collections.emptyList();
+            }
             // Phase 1: Dense 向量检索
             float[] queryVector = embeddingService.embed(query);
             List<Float> floatList = new ArrayList<>(queryVector.length);
             for (float v : queryVector) floatList.add(v);
             Embedding queryEmbedding = Embedding.from(floatList);
-            List<EmbeddingMatch<TextSegment>> matches = embeddingStore.search(
+            List<EmbeddingMatch<TextSegment>> matches = store.search(
                     EmbeddingSearchRequest.builder()
                             .queryEmbedding(queryEmbedding)
                             .maxResults(DENSE_TOP_K)

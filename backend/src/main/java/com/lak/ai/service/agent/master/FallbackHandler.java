@@ -14,10 +14,11 @@ import java.util.Collections;
 public class FallbackHandler {
 
     private static final String FALLBACK_TEMPLATE = """
-            感谢您的咨询。为确保给您提供准确的信息，建议您通过以下方式联系我们的人工客服：
-            - 服务热线：XXX-XXXXXXXX
-            - 工作时间：工作日 9:00-17:00
-            - 在线留言：请在官网留言板留下您的问题和联系方式
+            感谢您的咨询。为确保给您提供准确的信息，建议您通过以下方式联系公安机关：
+            - 报警电话：110（紧急情况）
+            - 辖区派出所：请前往您所在地派出所咨询，或拨打派出所值班电话
+            - 工作时间：工作日 9:00-12:00, 14:00-17:00
+            - 在线平台：登录当地公安局"互联网+政务服务平台"
             """;
 
     public AgentResponse handle(String sessionId, double confidence, String reason) {

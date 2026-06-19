@@ -26,18 +26,17 @@ public class TestDataLoader implements CommandLineRunner {
     public void run(String... args) {
         if (!loadOnStartup) return;
         // 政策法规 → lak_policy_docs
-        loadFiles("lak_policy_docs", "test-data/policy-001-行政复议法实施办法.txt",
-                                           "test-data/policy-002-行政处罚程序规定.txt");
+        loadFiles("lak_policy_docs", "test-data/policy-001-治安管理处罚法实施条例.txt");
         // 办事指南 → lak_procedure_docs
-        loadFiles("lak_procedure_docs", "test-data/procedure-001-行政执法证申领指南.txt",
-                                         "test-data/procedure-002-行政复议申请指南.txt");
+        loadFiles("lak_procedure_docs", "test-data/procedure-001-居民身份证办理指南.txt",
+                                         "test-data/procedure-002-无犯罪记录证明办理指南.txt");
     }
 
     private void loadFiles(String collection, String... files) {
         for (String file : files) {
             try {
-                Path path = new ClassPathResource(file).getFile().toPath();
-                int chunks = ingestionService.ingest(path, collection);
+                var resource = new ClassPathResource(file);
+                int chunks = ingestionService.ingest(resource.getInputStream(), collection);
                 log.info("导入完成: {} → {} chunks (collection={})", file, chunks, collection);
             } catch (Exception e) {
                 log.warn("导入跳过 ({}): {}", file, e.getMessage());

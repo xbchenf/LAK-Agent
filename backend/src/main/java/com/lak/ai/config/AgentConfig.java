@@ -21,7 +21,7 @@ public class AgentConfig {
 
     @Bean
     public ChatModel chatModel(@Value("${DASHSCOPE_API_KEY}") String apiKey) {
-        return QwenChatModel.builder().apiKey(apiKey).modelName("qwen3.7-max").build();
+        return QwenChatModel.builder().apiKey(apiKey).modelName("qwen-plus").build();
     }
 
     @Bean
@@ -30,6 +30,7 @@ public class AgentConfig {
     }
 
     @Bean
+    @org.springframework.context.annotation.Primary
     public QdrantEmbeddingStore policyEmbeddingStore() {
         return QdrantEmbeddingStore.builder()
                 .host("localhost").port(6334)

@@ -55,7 +55,8 @@ public class RateLimitFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
-        String userId = (String) httpRequest.getAttribute("userId");
+        Object userIdObj = httpRequest.getAttribute("userId");
+        String userId = userIdObj != null ? String.valueOf(userIdObj) : null;
         if (userId == null) {
             userId = httpRequest.getRemoteAddr();  // 未认证用户按 IP 限流
         }

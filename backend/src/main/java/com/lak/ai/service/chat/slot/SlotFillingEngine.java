@@ -38,7 +38,7 @@ public class SlotFillingEngine {
         return List.of(
                 SlotDefinition.builder()
                         .name("complaintType").label("投诉类型").required(true)
-                        .promptTemplate("请问您要反馈的是哪类问题？\n1.执法建议 2.服务投诉 3.违纪举报 4.其他")
+                        .promptTemplate("请问您要反馈的是哪类问题？\n1.治安投诉（打架斗殴、噪音扰民、赌博等）\n2.窗口服务投诉（户籍、身份证办理等）\n3.派出所/民警投诉\n4.其他")
                         .build(),
                 SlotDefinition.builder()
                         .name("contactName").label("联系人").required(true)

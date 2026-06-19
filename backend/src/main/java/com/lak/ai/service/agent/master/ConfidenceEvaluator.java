@@ -28,16 +28,17 @@ public class ConfidenceEvaluator {
     private static final Pattern DOC_NUMBER_PATTERN =
             Pattern.compile("[\\u4e00-\\u9fff]{1,5}[政发]\\s*〔\\d{4}〕\\s*\\d+\\s*号");
     private static final Pattern COMPLAINT_KEYWORD_PATTERN =
-            Pattern.compile("投诉|举报|不作为|乱收费|违纪|反映问题|我要告|我要投诉");
+            Pattern.compile("投诉|举报|不作为|乱收费|出警慢|态度差|违规执法|我要告|我要投诉|暴力执法");
     private static final Pattern ARTICLE_PATTERN =
             Pattern.compile("第[一二三四五六七八九十百千]+[章节条款项]");
 
-    // 政法术语表
+    // 公安领域术语表
     private static final String[] LEGAL_TERMS = {
-            "行政复议", "行政诉讼", "行政处罚", "行政许可", "行政强制", "信息公开",
-            "执法程序", "执法资格", "执法证件", "工伤认定", "社会保险", "劳动争议",
-            "信访条例", "人民调解", "法律援助", "司法鉴定", "公证处", "律师",
-            "治安管理", "交通违法", "户籍管理", "出入境", "身份证", "居住证"
+            "治安管理", "交通管理", "户籍管理", "出入境", "身份证", "居住证",
+            "特种行业", "消防安全", "禁毒", "网络安全", "枪支管理", "爆炸物品",
+            "养犬管理", "流动人口", "出租房屋", "110接处警", "派出所", "交警",
+            "刑事侦查", "电信诈骗", "赌博", "卖淫嫖娼", "盗窃", "故意伤害",
+            "寻衅滋事", "危险驾驶", "酒后驾车", "超速行驶", "肇事逃逸"
     };
 
     private final EmbeddingService embeddingService;
@@ -51,7 +52,7 @@ public class ConfidenceEvaluator {
      */
     public ConfidenceResult evaluate(ClassificationResult classification, String userMessage) {
         // 1. 响应层校验
-        if (!classification.rawResponse().isBlank()) {
+        if (classification.rawResponse() == null || classification.rawResponse().isBlank()) {
             return new ConfidenceResult(IntentType.UNKNOWN, 0.0, "模型调用失败", true);
         }
         if (classification.intentType() == null || classification.intentType() == IntentType.UNKNOWN) {

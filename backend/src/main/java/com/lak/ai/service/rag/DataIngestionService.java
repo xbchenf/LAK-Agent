@@ -6,7 +6,6 @@ import com.lak.ai.service.rag.embedding.EmbeddingService;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +19,6 @@ import java.util.Map;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class DataIngestionService {
 
     private final DocumentChunker chunker;
@@ -28,8 +26,17 @@ public class DataIngestionService {
     private final QdrantEmbeddingStore policyStore;
     private final QdrantEmbeddingStore procedureStore;
 
-    public int ingest(Path filePath, String collection) throws IOException {
-        String fullText = Files.readString(filePath, StandardCharsets.UTF_8);
+    public DataIngestionService(DocumentChunker chunker, EmbeddingService embeddingService,
+            @org.springframework.beans.factory.annotation.Qualifier("policyEmbeddingStore") QdrantEmbeddingStore policyStore,
+            @org.springframework.beans.factory.annotation.Qualifier("procedureEmbeddingStore") QdrantEmbeddingStore procedureStore) {
+        this.chunker = chunker;
+        this.embeddingService = embeddingService;
+        this.policyStore = policyStore;
+        this.procedureStore = procedureStore;
+    }
+
+    public int ingest(java.io.InputStream inputStream, String collection) throws IOException {
+        String fullText = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         Meta meta = parseMetadata(fullText);
         String mainContent = extractMainContent(fullText);
 
