@@ -110,9 +110,10 @@ public class ChatService {
                 RoutingDecisionBO decision = masterAgent.route(request(uid, sid, msg));
 
                 if (decision.isFallback()) {
-                    AgentResponse r = masterAgent.fallback(sid, decision); // uses intentType for friendly CHITCHAT
-                    emitter.send(SseEmitter.event().name("message").data(r.getAnswer().substring(0, Math.min(100, r.getAnswer().length()))));
+                    AgentResponse r = masterAgent.fallback(sid, decision);
+                    emitter.send(SseEmitter.event().name("message").data(r.getAnswer()));
                     emitter.send(SseEmitter.event().name("done").data(Map.of("sessionId",sid,"intentType","FALLBACK")));
+                    appendToContext(sid, "assistant", r.getAnswer());
                     emitter.complete(); return;
                 }
 
