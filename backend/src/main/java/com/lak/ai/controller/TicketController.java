@@ -24,6 +24,16 @@ public class TicketController {
     private final SessionManager sessionManager;
 
     /**
+     * 当前用户的工单列表 — GET /api/v1/tickets/mine
+     */
+    @GetMapping("/mine")
+    public ApiResponse<java.util.List<Ticket>> myTickets(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) return ApiResponse.error(401, "未认证");
+        return ApiResponse.success(ticketAdapter.queryUserTickets(userId));
+    }
+
+    /**
      * 创建工单 — POST /api/v1/tickets
      */
     @PostMapping

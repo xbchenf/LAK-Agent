@@ -21,7 +21,7 @@ function newChat() { chat.clearMessages() }
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="logo-icon">⚖</div>
-        <span class="logo-text">公安知识平台</span>
+        <span class="logo-text">公安智能助手</span>
       </div>
       <nav class="sidebar-nav">
         <a class="nav-item" :class="{ active: activeMenu === '/' }" @click="newChat(); router.push('/')">
