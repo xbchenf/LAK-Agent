@@ -52,15 +52,22 @@ public class ChatService {
                 .context(context)
                 .build();
 
-        // 3. 主Agent 意图路由 — 投诉采集流程中跳过分类
+        // 3. 主Agent 意图路由 — 投诉采集流程中智能判断
         SessionStatus currentStatus = sessionManager.getStatus(sessionId);
         RoutingDecisionBO decision;
         if (currentStatus == SessionStatus.COLLECT_INFO) {
-            // 正在投诉填槽中，直接发给 ComplaintAgent
-            decision = RoutingDecisionBO.builder()
-                    .intentType(IntentType.COMPLAINT_SUGGEST)
-                    .confidence(1.0).targetAgentId("agent-complaint")
-                    .fallback(false).reasoning("继续投诉填槽").costMs(0).build();
+            // 正在投诉填槽中：先分类，如果明显不是投诉（高置信度+非COMPLAINT_SUGGEST）则切换意图
+            RoutingDecisionBO reclassify = masterAgent.route(request);
+            if (reclassify.getConfidence() >= 0.7
+                    && reclassify.getIntentType() != IntentType.COMPLAINT_SUGGEST) {
+                log.info("投诉填槽中检测到新意图, 退出投诉流程, newIntent={}", reclassify.getIntentType());
+                decision = reclassify;
+            } else {
+                decision = RoutingDecisionBO.builder()
+                        .intentType(IntentType.COMPLAINT_SUGGEST)
+                        .confidence(1.0).targetAgentId("agent-complaint")
+                        .fallback(false).reasoning("继续投诉填槽").costMs(0).build();
+            }
         } else {
             sessionManager.transition(sessionId, SessionStatus.INTENT_CHECK);
             decision = masterAgent.route(request);
@@ -90,7 +97,7 @@ public class ChatService {
             return ChatResult.of(sessionId, fallback, decision);
         }
 
-        // 5. 合规校验 — 投诉Agent自管状态机，跳过状态覆盖
+        // 5. 合规校验 — 投诉跳过状态覆盖，但仍执行校验逻辑
         if (!isComplaint) {
             sessionManager.transition(sessionId, SessionStatus.COMPLIANCE_CHECK);
         }
