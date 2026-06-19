@@ -59,7 +59,8 @@ public class ChatService {
             // 正在投诉填槽中：先分类，如果明显不是投诉（高置信度+非COMPLAINT_SUGGEST）则切换意图
             RoutingDecisionBO reclassify = masterAgent.route(request);
             if (reclassify.getConfidence() >= 0.7
-                    && reclassify.getIntentType() != IntentType.COMPLAINT_SUGGEST) {
+                    && (reclassify.getIntentType() == IntentType.POLICY_CONSULT
+                        || reclassify.getIntentType() == IntentType.PROCEDURE_GUIDE)) {
                 log.info("投诉填槽中检测到新意图, 退出投诉流程, newIntent={}", reclassify.getIntentType());
                 decision = reclassify;
             } else {
