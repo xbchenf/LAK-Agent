@@ -2,6 +2,7 @@ package com.lak.ai.service.chat.session;
 
 import com.lak.ai.enums.SessionStatus;
 import com.lak.ai.mapper.ChatSessionMapper;
+import com.lak.ai.model.bo.ContextMessage;
 import com.lak.ai.model.entity.ChatSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.HashOperations;
