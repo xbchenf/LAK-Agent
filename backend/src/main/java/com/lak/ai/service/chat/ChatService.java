@@ -1,5 +1,6 @@
 package com.lak.ai.service.chat;
 
+import com.lak.ai.enums.IntentType;
 import com.lak.ai.enums.SessionStatus;
 import com.lak.ai.model.bo.AgentRequest;
 import com.lak.ai.model.bo.AgentResponse;
@@ -51,9 +52,19 @@ public class ChatService {
                 .context(context)
                 .build();
 
-        // 3. 主Agent 意图路由
-        sessionManager.transition(sessionId, SessionStatus.INTENT_CHECK);
-        RoutingDecisionBO decision = masterAgent.route(request);
+        // 3. 主Agent 意图路由 — 投诉采集流程中跳过分类
+        SessionStatus currentStatus = sessionManager.getStatus(sessionId);
+        RoutingDecisionBO decision;
+        if (currentStatus == SessionStatus.COLLECT_INFO) {
+            // 正在投诉填槽中，直接发给 ComplaintAgent
+            decision = RoutingDecisionBO.builder()
+                    .intentType(IntentType.COMPLAINT_SUGGEST)
+                    .confidence(1.0).targetAgentId("agent-complaint")
+                    .fallback(false).reasoning("继续投诉填槽").costMs(0).build();
+        } else {
+            sessionManager.transition(sessionId, SessionStatus.INTENT_CHECK);
+            decision = masterAgent.route(request);
+        }
 
         if (decision.isFallback()) {
             sessionManager.transition(sessionId, SessionStatus.FALLBACK);
@@ -64,11 +75,14 @@ public class ChatService {
             return ChatResult.of(sessionId, fallbackResponse, decision);
         }
 
+        boolean isComplaint = decision.getIntentType() == IntentType.COMPLAINT_SUGGEST;
+
         // 4. 子Agent 执行
-        sessionManager.transition(sessionId, SessionStatus.ANSWERING);
+        if (!isComplaint) {
+            sessionManager.transition(sessionId, SessionStatus.ANSWERING);
+        }
         AgentResponse response = scheduler.dispatch(decision.getIntentType(), request);
         if (response == null) {
-            // 无匹配 Agent → 走兜底
             sessionManager.transition(sessionId, SessionStatus.FALLBACK);
             AgentResponse fallback = masterAgent.fallback(sessionId, decision);
             enforceCompliance(sessionId, fallback);
@@ -76,8 +90,10 @@ public class ChatService {
             return ChatResult.of(sessionId, fallback, decision);
         }
 
-        // 5. 合规校验
-        sessionManager.transition(sessionId, SessionStatus.COMPLIANCE_CHECK);
+        // 5. 合规校验 — 投诉Agent自管状态机，跳过状态覆盖
+        if (!isComplaint) {
+            sessionManager.transition(sessionId, SessionStatus.COMPLIANCE_CHECK);
+        }
         if (!validator.validate(response, null)) {
             log.warn("合规校验未通过, sessionId={}", sessionId);
             response = AgentResponse.builder()
