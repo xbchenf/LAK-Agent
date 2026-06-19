@@ -27,7 +27,13 @@ async function switchSession(sid: string) {
   try {
     const data = await request.get(`/chat/sessions/${sid}`) as any
     const msgs = data.messages || []
-    msgs.forEach((m: any) => chat.addMessage({ role: m.role, content: m.content }))
+    // 去重：连续重复的用户消息只保留一条
+    const deduped: any[] = []
+    for (let i = 0; i < msgs.length; i++) {
+      if (i > 0 && msgs[i].role === msgs[i-1].role && msgs[i].content === msgs[i-1].content) continue
+      deduped.push(msgs[i])
+    }
+    deduped.forEach((m: any) => chat.addMessage({ role: m.role, content: m.content }))
   } catch { /* ignore */ }
 }
 

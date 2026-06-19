@@ -127,8 +127,16 @@ public class SessionManager {
         String json = (String) redisTemplate.opsForHash().get(sessionKey(sessionId), "contextWindow");
         if (json == null || json.isBlank()) return List.of();
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper()
+            List<ContextMessage> all = new com.fasterxml.jackson.databind.ObjectMapper()
                     .readValue(json, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            // 去重：连续相同的消息只保留一条
+            List<ContextMessage> deduped = new java.util.ArrayList<>();
+            for (int i = 0; i < all.size(); i++) {
+                if (i > 0 && all.get(i).getRole().equals(all.get(i-1).getRole())
+                        && all.get(i).getContent().equals(all.get(i-1).getContent())) continue;
+                deduped.add(all.get(i));
+            }
+            return deduped;
         } catch (Exception e) { return List.of(); }
     }
 
