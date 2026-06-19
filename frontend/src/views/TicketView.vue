@@ -39,7 +39,9 @@ async function loadMyTickets() {
   try {
     const data = await request.get('/tickets/mine') as any
     tickets.value = data || []
-  } catch { /* ignore */ }
+  } catch {
+    // Token可能过期，静默处理，不触发全局登出
+  }
 }
 
 async function searchTicket() {
