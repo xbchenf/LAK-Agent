@@ -123,17 +123,27 @@ public class ChatService {
                 if (decision.getIntentType() == IntentType.POLICY_CONSULT) {
                     TokenStream stream = policyAgentService.answerStream(msg, policyTools.search(msg));
                     stream.onPartialResponse(t -> { answerBuf.append(t); safeSend(emitter, t); })
-                          .onCompleteResponse(c -> { safeSendDone(emitter, sid, intentName); emitter.complete();
-                              appendToContext(sid, "assistant", answerBuf.toString()); })
-                          .onError(e -> emitter.completeWithError(e)).start();
+                          .onCompleteResponse(c -> {
+                              safeSendDone(emitter, sid, intentName); emitter.complete();
+                              String full = answerBuf.toString();
+                              appendToContext(sid, "assistant", full);
+                              AgentResponse tr = AgentResponse.builder().answer(full).build();
+                              if (!validator.validate(tr, null))
+                                  log.warn("SSE流式答复合规校验未通过, sessionId={}", sid);
+                          }).onError(e -> emitter.completeWithError(e)).start();
                     return;
                 }
                 if (decision.getIntentType() == IntentType.PROCEDURE_GUIDE) {
                     TokenStream stream = procedureAgentService.answerStream(msg, procedureTools.search(msg));
                     stream.onPartialResponse(t -> { answerBuf.append(t); safeSend(emitter, t); })
-                          .onCompleteResponse(c -> { safeSendDone(emitter, sid, intentName); emitter.complete();
-                              appendToContext(sid, "assistant", answerBuf.toString()); })
-                          .onError(e -> emitter.completeWithError(e)).start();
+                          .onCompleteResponse(c -> {
+                              safeSendDone(emitter, sid, intentName); emitter.complete();
+                              String full = answerBuf.toString();
+                              appendToContext(sid, "assistant", full);
+                              AgentResponse tr = AgentResponse.builder().answer(full).build();
+                              if (!validator.validate(tr, null))
+                                  log.warn("SSE流式答复合规校验未通过, sessionId={}", sid);
+                          }).onError(e -> emitter.completeWithError(e)).start();
                     return;
                 }
 
@@ -150,14 +160,6 @@ public class ChatService {
                 if (response != null) appendToContext(sid, "assistant", response.getAnswer());
                 emitter.complete();
 
-                // 流式路径的后置合规日志（无法撤回已发Token，但记录告警）
-                String finalAnswer = answerBuf.toString();
-                if (!finalAnswer.isEmpty() && validator != null) {
-                    AgentResponse tempResp = AgentResponse.builder().answer(finalAnswer).build();
-                    if (!validator.validate(tempResp, null)) {
-                        log.warn("SSE流式答复合规校验未通过(已发送), sessionId={}", sid);
-                    }
-                }
             } catch (Exception e) {
                 log.error("SSE stream error", e);
                 try { emitter.send(SseEmitter.event().name("error").data(Map.of("message","系统繁忙"))); }
