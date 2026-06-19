@@ -30,10 +30,17 @@ public class AgentConfig {
     }
 
     @Bean
-    public QdrantEmbeddingStore qdrantEmbeddingStore() {
+    public QdrantEmbeddingStore policyEmbeddingStore() {
         return QdrantEmbeddingStore.builder()
                 .host("localhost").port(6334)
                 .collectionName("lak_policy_docs").build();
+    }
+
+    @Bean
+    public QdrantEmbeddingStore procedureEmbeddingStore() {
+        return QdrantEmbeddingStore.builder()
+                .host("localhost").port(6334)
+                .collectionName("lak_procedure_docs").build();
     }
 
     @Bean

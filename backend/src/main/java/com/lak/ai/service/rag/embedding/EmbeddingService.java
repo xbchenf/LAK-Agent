@@ -28,7 +28,10 @@ public class EmbeddingService {
         return toFloatArray(embedding.vectorAsList());
     }
 
-    /** 预留批量接口，当前 LangChain4j 1.x 版本嵌入API待适配 */
+    /** 用于数据导入——直接返回Embedding对象，避免float[]转换 */
+    public Embedding embedForStore(String text) {
+        return embeddingModel.embed(text).content();
+    }
 
     /**
      * 获取向量维度。
