@@ -137,15 +137,27 @@ public class ChatService {
                     return;
                 }
 
-                // 非 policy/procedure → JSON 一次性返回
+                // 非 policy/procedure → JSON 一次性返回（校验后再发送）
                 AgentResponse response = scheduler.dispatch(decision.getIntentType(),
-                        request(userId, sessionId, message));
+                        request(uid, sid, msg));
+                if (response != null && !validator.validate(response, null)) {
+                    response.setAnswer("系统繁忙，请稍后重试");
+                }
                 emitter.send(SseEmitter.event().name("message").data(
                         response != null ? response.getAnswer() : "系统繁忙"));
                 emitter.send(SseEmitter.event().name("done").data(Map.of(
                         "sessionId",sid,"intentType",decision.getIntentType().name())));
                 if (response != null) appendToContext(sid, "assistant", response.getAnswer());
                 emitter.complete();
+
+                // 流式路径的后置合规日志（无法撤回已发Token，但记录告警）
+                String finalAnswer = answerBuf.toString();
+                if (!finalAnswer.isEmpty() && validator != null) {
+                    AgentResponse tempResp = AgentResponse.builder().answer(finalAnswer).build();
+                    if (!validator.validate(tempResp, null)) {
+                        log.warn("SSE流式答复合规校验未通过(已发送), sessionId={}", sid);
+                    }
+                }
             } catch (Exception e) {
                 log.error("SSE stream error", e);
                 try { emitter.send(SseEmitter.event().name("error").data(Map.of("message","系统繁忙"))); }
