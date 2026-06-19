@@ -26,10 +26,13 @@ public class TestDataLoader implements CommandLineRunner {
     public void run(String... args) {
         if (!loadOnStartup) return;
         // 政策法规 → lak_policy_docs
-        loadFiles("lak_policy_docs", "test-data/policy-001-治安管理处罚法实施条例.txt");
+        loadFiles("lak_policy_docs", "test-data/policy-001-治安管理处罚法实施条例.txt",
+                                           "test-data/policy-002-旅馆业治安管理办法.txt");
         // 办事指南 → lak_procedure_docs
         loadFiles("lak_procedure_docs", "test-data/procedure-001-居民身份证办理指南.txt",
-                                         "test-data/procedure-002-无犯罪记录证明办理指南.txt");
+                                         "test-data/procedure-002-无犯罪记录证明办理指南.txt",
+                                         "test-data/procedure-003-户口迁移办理指南.txt",
+                                         "test-data/procedure-004-居住证办理指南.txt");
     }
 
     private void loadFiles(String collection, String... files) {

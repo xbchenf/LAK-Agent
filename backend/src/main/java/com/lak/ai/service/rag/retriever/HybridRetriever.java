@@ -34,12 +34,12 @@ public class HybridRetriever {
     private final Map<String, QdrantEmbeddingStore> stores;
 
     public HybridRetriever(EmbeddingService embeddingService,
-            List<QdrantEmbeddingStore> storeList) {
+            @org.springframework.beans.factory.annotation.Qualifier("policyEmbeddingStore") QdrantEmbeddingStore policyStore,
+            @org.springframework.beans.factory.annotation.Qualifier("procedureEmbeddingStore") QdrantEmbeddingStore procedureStore) {
         this.embeddingService = embeddingService;
-        this.stores = new HashMap<>();
-        for (var store : storeList) {
-            this.stores.put(store.toString().contains("procedure") ? "lak_procedure_docs" : "lak_policy_docs", store);
-        }
+        this.stores = Map.of(
+                "lak_policy_docs", policyStore,
+                "lak_procedure_docs", procedureStore);
     }
 
     @Value("${lak.rag.retrieval-timeout-seconds:3}")
