@@ -31,9 +31,11 @@ function newChat() {
 }
 
 async function deleteSession(sid: string) {
-  try { await request.delete(`/chat/sessions/${sid}`) } catch { /* */ }
-  if (chat.currentSessionId === sid) { chat.clearMessages() }
-  loadSessions()
+  try {
+    await request.delete(`/chat/sessions/${sid}`)
+    if (chat.currentSessionId === sid) { chat.clearMessages() }
+    await loadSessions()
+  } catch { /* 忽略删除错误 */ }
 }
 
 function logout() { auth.logout(); router.push('/login') }
@@ -66,7 +68,7 @@ const intentLabel: Record<string, string> = {
              @click="switchSession(s.sessionId); router.push('/')">
           <span class="s-icon">{{ intentLabel[s.intentType] || '💬' }}</span>
           <span class="s-text">{{ s.createTime?.substring(5,16) || '' }}</span>
-          <span class="s-del" @click.stop="deleteSession(s.sessionId)">×</span>
+          <span class="s-del" title="删除会话" @click.stop="deleteSession(s.sessionId)">×</span>
         </div>
       </div>
 
@@ -117,11 +119,10 @@ const intentLabel: Record<string, string> = {
 .s-icon { font-size: 14px; flex-shrink: 0; }
 .s-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .s-del {
-  opacity: 0; font-size: 16px; color: rgba(255,255,255,0.4);
-  padding: 0 4px; transition: opacity 0.15s;
+  opacity: 0.4; font-size: 16px; color: rgba(255,255,255,0.3);
+  padding: 0 4px; cursor: pointer; transition: opacity 0.15s; flex-shrink: 0;
 }
-.session-item:hover .s-del { opacity: 1; }
-.s-del:hover { color: var(--color-danger); }
+.s-del:hover { opacity: 1; color: var(--color-danger); }
 .new-chat { color: var(--color-accent) !important; font-weight: 500; }
 
 .sidebar-footer {
