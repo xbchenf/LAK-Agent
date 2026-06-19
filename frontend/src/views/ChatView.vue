@@ -15,24 +15,54 @@ async function onSend() {
   const text = inputText.value.trim()
   if (!text || chat.isStreaming || text.length > 2000) return
   inputText.value = ''
-
   chat.addMessage({ role: 'user', content: text })
   chat.isStreaming = true
   chat.addMessage({ role: 'assistant', content: '', isStreaming: true })
   scrollBottom()
 
   try {
-    const result = await sendMessage(chat.currentSessionId, text)
-    const last = chat.messages.at(-1)
-    if (last) {
-      last.content = result.answer || ''
-      last.sources = result.sources as unknown as SourceDoc[] || []
-      last.isStreaming = false
-      last.sessionId = result.sessionId
+    const resp = await fetch('/api/v1/chat/message', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${auth.accessToken}`,
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify({ sessionId: chat.currentSessionId, message: text }),
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+
+    const reader = resp.body!.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    const last = chat.messages.at(-1)!
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          const data = line.slice(5).trim()
+          if (!data) continue
+          try {
+            const json = JSON.parse(data)
+            if (json.sessionId && !chat.currentSessionId) chat.currentSessionId = json.sessionId
+          } catch {
+            // plain text token
+            last.content += data
+            scrollBottom()
+          }
+        } else if (line.startsWith('event:done')) {
+          // handled below
+        } else if (line.startsWith('event:error')) {
+          last.content = last.content || '系统繁忙，请稍后重试'
+        }
+      }
     }
-    if (result.sessionId && !chat.currentSessionId) {
-      chat.currentSessionId = result.sessionId
-    }
+    last.isStreaming = false
   } catch {
     const last = chat.messages.at(-1)
     if (last) { last.content = '系统繁忙，请稍后重试'; last.isStreaming = false }

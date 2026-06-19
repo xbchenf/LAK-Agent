@@ -1,6 +1,7 @@
 package com.lak.ai.service.agent.sub;
 
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 
@@ -21,4 +22,11 @@ public interface PolicyAgentService {
             """)
     @UserMessage("检索资料:\n{{docs}}\n\n用户问题: {{question}}")
     String answer(@V("question") String question, @V("docs") String docs);
+
+    @SystemMessage("""
+            你是一名专业的公安领域智能助手，负责基于检索到的公安法律法规资料回答问题。
+            规则：只使用检索资料中的内容，资料为空时回答"根据现有资料，无法确定"。引用法规时注明文件编号和条款号。
+            """)
+    @UserMessage("检索资料:\n{{docs}}\n\n用户问题: {{question}}")
+    TokenStream answerStream(@V("question") String question, @V("docs") String docs);
 }

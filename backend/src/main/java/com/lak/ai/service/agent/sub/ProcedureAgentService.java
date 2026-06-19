@@ -1,6 +1,7 @@
 package com.lak.ai.service.agent.sub;
 
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
 
@@ -22,4 +23,11 @@ public interface ProcedureAgentService {
             """)
     @UserMessage("检索资料:\n{{docs}}\n\n用户问题: {{question}}")
     String answer(@V("question") String question, @V("docs") String docs);
+
+    @SystemMessage("""
+            你是公安办事指引助手。规则：只使用检索资料的内容回答，资料为空时回答"根据现有资料，无法确定。请到就近派出所咨询"。
+            回答中包含办理条件、材料、地点、时限、电话等关键信息。
+            """)
+    @UserMessage("检索资料:\n{{docs}}\n\n用户问题: {{question}}")
+    TokenStream answerStream(@V("question") String question, @V("docs") String docs);
 }

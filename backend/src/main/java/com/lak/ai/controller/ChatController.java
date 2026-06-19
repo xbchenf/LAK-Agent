@@ -40,57 +40,20 @@ public class ChatController {
 
         String accept = request.getHeader("Accept");
         if (accept != null && accept.contains("text/event-stream")) {
-            return handleSse(dto, userId);
+            return chatService.processMessageStream(userId, dto.getSessionId(), dto.getMessage());
         }
         return handleJson(dto, userId);
     }
 
-    private SseEmitter handleSse(ChatMessageDTO dto, Long userId) {
-        SseEmitter emitter = new SseEmitter(60_000L); // 60s 超时
-        ChatResult result = chatService.processMessage(userId, dto.getSessionId(), dto.getMessage());
-
-        // 在后台线程发送（SSE 异步）
-        new Thread(() -> {
-            try {
-                if (result.error()) {
-                    emitter.send(SseEmitter.event()
-                            .name("error")
-                            .data(Map.of("message", result.errorMessage())));
-                } else {
-                    emitter.send(SseEmitter.event()
-                            .name("done")
-                            .data(Map.of(
-                                    "sessionId", result.sessionId(),
-                                    "answer", result.response().getAnswer(),
-                                    "sources", result.response().getSources() != null
-                                            ? result.response().getSources() : java.util.Collections.emptyList(),
-                                    "confidence", result.response().getConfidence(),
-                                    "intentType", result.response().getIntentType()
-                            )));
-                }
-                emitter.complete();
-            } catch (IOException e) {
-                log.error("SSE发送失败", e);
-                emitter.completeWithError(e);
-            }
-        }).start();
-
-        return emitter;
-    }
-
     private ApiResponse<Map<String, Object>> handleJson(ChatMessageDTO dto, Long userId) {
         ChatResult result = chatService.processMessage(userId, dto.getSessionId(), dto.getMessage());
-        if (result.error()) {
-            return ApiResponse.error(404, result.errorMessage());
-        }
+        if (result.error()) return ApiResponse.error(404, result.errorMessage());
         return ApiResponse.success(Map.of(
-                "sessionId", result.sessionId(),
-                "answer", result.response().getAnswer(),
+                "sessionId", result.sessionId(), "answer", result.response().getAnswer(),
                 "sources", result.response().getSources() != null
                         ? result.response().getSources() : java.util.Collections.emptyList(),
                 "confidence", result.response().getConfidence(),
-                "intentType", result.response().getIntentType()
-        ));
+                "intentType", result.response().getIntentType()));
     }
 
     /**
