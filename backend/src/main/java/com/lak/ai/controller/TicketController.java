@@ -44,7 +44,9 @@ public class TicketController {
                 "contactPhone", dto.getContactPhone(),
                 "description", dto.getDescription()
         );
-        String ticketNo = ticketAdapter.createTicket(dto.getSessionId(), slotValues);
+        String sid = dto.getSessionId() != null ? dto.getSessionId()
+                : "manual-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        String ticketNo = ticketAdapter.createTicket(sid, slotValues);
         return ApiResponse.success(Map.of("ticketNo", ticketNo, "status", "PENDING"));
     }
 
