@@ -122,6 +122,15 @@ public class SessionManager {
     public record SessionPage(List<SessionVO> records, long total) {}
     public record SessionVO(String sessionId, String status, String intentType, String createTime) {}
 
+    public List<ContextMessage> getMessages(String sessionId) {
+        String json = (String) redisTemplate.opsForHash().get(sessionKey(sessionId), "contextWindow");
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(json, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+        } catch (Exception e) { return List.of(); }
+    }
+
     public SessionPage listSessions(Long userId, int page, int size) {
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<ChatSession> mpPage =
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);

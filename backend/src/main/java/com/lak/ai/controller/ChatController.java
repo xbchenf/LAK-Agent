@@ -81,6 +81,9 @@ public class ChatController {
         if (fields == null || fields.isEmpty()) {
             return ApiResponse.error(404, "会话不存在");
         }
+        // 附带上下文消息
+        var messages = chatService.getSessionManager().getMessages(sessionId);
+        fields.put("messages", messages != null ? messages : java.util.Collections.emptyList());
         return ApiResponse.success(fields);
     }
 

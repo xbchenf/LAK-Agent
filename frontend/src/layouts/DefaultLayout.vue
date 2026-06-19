@@ -20,9 +20,15 @@ async function loadSessions() {
   catch { /* ignore */ }
 }
 
-function switchSession(sid: string) {
+async function switchSession(sid: string) {
   chat.currentSessionId = sid
   chat.clearMessages()
+  // 加载历史消息
+  try {
+    const data = await request.get(`/chat/sessions/${sid}`) as any
+    const msgs = data.messages || []
+    msgs.forEach((m: any) => chat.addMessage({ role: m.role, content: m.content }))
+  } catch { /* ignore */ }
 }
 
 function newChat() {
