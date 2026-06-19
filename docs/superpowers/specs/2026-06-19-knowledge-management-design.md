@@ -154,8 +154,8 @@ DocumentParser (接口)
   └── DocxDocumentParser      # Apache POI 提取文本 + 标题结构（Heading 样式）
 ```
 
-- PDF 解析策略：逐页提取文本，检测字号突变作为潜在标题，保留段落边界
-- DOCX 解析策略：遍历段落，识别 `Heading` 样式层级，转换为 `#` / `##` 标记
+- PDF 解析策略：PDFBox 逐页提取文本 → 若文本量正常（≥文件大小×0.3）直接用；若近乎无文本（扫描件），逐页渲染为图片 → RapidOCR CLI 识别，保留段落边界
+- DOCX 解析策略：Apache POI 遍历段落，识别 `Heading` 样式层级，转换为 `#` / `##` 标记
 - TXT 解析策略：直接读取，保留换行符用于 `DocumentChunker` 结构识别
 - 返回文本统一标记：`## 第X章 XXX` / `### 第X条` / `**表格:**` 等，与现有 `DocumentChunker` 兼容
 
@@ -366,8 +366,9 @@ ALTER TABLE knowledge_document ADD INDEX idx_doc_type_status (doc_type, status);
 
 | 组件 | 选型 | 说明 |
 |------|------|------|
-| PDF 解析 | Apache PDFBox 3.0+ | 纯 Java，无外部依赖，适合私有化 |
-| DOCX 解析 | Apache POI 5.2+ | 业界标准，读取段落+样式 |
+| PDF 解析 | Apache PDFBox 3.0+ | 电子 PDF 文本提取 |
+| DOCX 解析 | Apache POI 5.2+ | Word 文档段落+样式读取 |
+| PDF OCR 兜底 | RapidOCR | ONNX Runtime，免 Python，CLI 调用，处理扫描件 |
 | 文件上传 | Spring MultipartFile | 标准实现 |
 | 定时过期 | Spring `@Scheduled` | 每小时扫描一次，简单可靠 |
 
