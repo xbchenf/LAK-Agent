@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -111,6 +112,23 @@ public class SessionManager {
     /**
      * 刷新会话 TTL。
      */
+    public record SessionPage(List<SessionVO> records, long total) {}
+    public record SessionVO(String sessionId, String status, String intentType, String createTime) {}
+
+    public SessionPage listSessions(Long userId, int page, int size) {
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ChatSession> mpPage =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+        var wrapper = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ChatSession>()
+                .eq(ChatSession::getUserId, userId)
+                .orderByDesc(ChatSession::getCreateTime);
+        var result = sessionMapper.selectPage(mpPage, wrapper);
+        List<SessionVO> records = result.getRecords().stream()
+                .map(s -> new SessionVO(s.getSessionId(), s.getStatus(), s.getIntentType(),
+                        s.getCreateTime() != null ? s.getCreateTime().toString() : ""))
+                .toList();
+        return new SessionPage(records, result.getTotal());
+    }
+
     public void touch(String sessionId) {
         HashOperations<String, String, String> hash = redisTemplate.opsForHash();
         hash.put(sessionKey(sessionId), FIELD_LAST_ACTIVE, LocalDateTime.now().toString());

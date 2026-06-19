@@ -62,10 +62,14 @@ public class ChatController {
     @GetMapping("/sessions")
     public ApiResponse<Map<String, Object>> listSessions(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        // TODO: 实现会话列表查询（Step 8 补齐 SessionService）
-        return ApiResponse.success(Map.of("records", java.util.Collections.emptyList(),
-                "total", 0, "page", page, "size", size));
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) return ApiResponse.error(401, "未认证");
+        var result = chatService.getSessionManager().listSessions(userId, page, size);
+        return ApiResponse.success(Map.of(
+                "records", result.records(), "total", result.total(),
+                "page", page, "size", size));
     }
 
     /**
