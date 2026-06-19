@@ -59,6 +59,7 @@ public class MasterAgent {
      * 兜底处理 — 不调用大模型生成答复。
      */
     public AgentResponse fallback(String sessionId, RoutingDecisionBO decision) {
-        return fallbackHandler.handle(sessionId, decision.getConfidence(), decision.getReasoning());
+        String intent = decision.getIntentType() != null ? decision.getIntentType().name() : null;
+        return fallbackHandler.handle(sessionId, decision.getConfidence(), decision.getReasoning(), intent);
     }
 }
