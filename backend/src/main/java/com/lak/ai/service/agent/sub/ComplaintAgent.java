@@ -7,6 +7,7 @@ import com.lak.ai.model.bo.AgentResponse;
 import com.lak.ai.service.agent.SubAgent;
 import com.lak.ai.service.chat.session.SessionManager;
 import com.lak.ai.service.chat.slot.SlotFillingEngine;
+import com.lak.ai.service.ticket.TicketAdapter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,7 @@ public class ComplaintAgent implements SubAgent {
 
     private final SessionManager sessionManager;
     private final SlotFillingEngine slotFillingEngine;
+    private final TicketAdapter ticketAdapter;
 
     @Override
     public String getAgentId() {
@@ -88,12 +90,14 @@ public class ComplaintAgent implements SubAgent {
             if (result.slotValues() != null && !result.slotValues().isEmpty()) {
                 // 所有槽位填充完成 → 创建工单（Step 8 实现 TicketAdapter）
                 Map<String, String> slots = result.slotValues();
-                log.info("投诉信息采集完成, sessionId={}, slotCount={}", sessionId, slots.size());
+                // 创建工单
+                String ticketNo = ticketAdapter.createTicket(sessionId, slots);
+                log.info("投诉信息采集完成并创建工单, sessionId={}, ticketNo={}", sessionId, ticketNo);
                 return AgentResponse.builder()
-                        .answer("您的诉求已受理，我们会尽快处理。如有需要，请留意您提供的联系方式。")
+                        .answer("您的诉求已受理，工单编号：" + ticketNo + "。我们会尽快处理，请留意您提供的联系方式。如需查询进度，可在工单查询页面输入工单编号。")
                         .confidence(1.0)
                         .intentType(IntentType.COMPLAINT_SUGGEST.name())
-                        .extra(Map.of("slotValues", slots, "ticketNo", "PENDING-STEP8"))
+                        .extra(Map.of("slotValues", slots, "ticketNo", ticketNo))
                         .build();
             }
             // 超时或其他终止
