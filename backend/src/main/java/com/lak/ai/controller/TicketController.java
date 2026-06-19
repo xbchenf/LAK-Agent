@@ -37,7 +37,9 @@ public class TicketController {
      * 创建工单 — POST /api/v1/tickets
      */
     @PostMapping
-    public ApiResponse<Map<String, Object>> createTicket(@Valid @RequestBody CreateTicketDTO dto) {
+    public ApiResponse<Map<String, Object>> createTicket(@Valid @RequestBody CreateTicketDTO dto,
+            HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
         Map<String, String> slotValues = Map.of(
                 "complaintType", dto.getComplaintType(),
                 "contactName", dto.getContactName(),
@@ -45,7 +47,7 @@ public class TicketController {
                 "description", dto.getDescription()
         );
         String sid = dto.getSessionId() != null ? dto.getSessionId()
-                : "manual-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+                : sessionManager.create(userId);
         String ticketNo = ticketAdapter.createTicket(sid, slotValues);
         return ApiResponse.success(Map.of("ticketNo", ticketNo, "status", "PENDING"));
     }
