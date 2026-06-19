@@ -56,10 +56,11 @@ public class ComplaintAgent implements SubAgent {
             }
 
             return switch (status) {
-                case NEW, INTENT_CHECK -> startNewComplaint(sessionId);
+                case NEW, INTENT_CHECK, ANSWERING, COMPLIANCE_CHECK, FALLBACK ->
+                        startNewComplaint(sessionId);
                 case COLLECT_INFO -> continueFilling(sessionId, userMessage);
                 case TICKET_SUBMIT -> handleTicketSubmit(sessionId, userMessage);
-                default -> alreadyClosed(sessionId);
+                case CLOSED -> alreadyClosed(sessionId);
             };
         } catch (Exception e) {
             log.error("投诉Agent处理失败, sessionId={}", sessionId, e);
