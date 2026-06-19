@@ -1,7 +1,8 @@
 package com.lak.ai.service.chat.session;
 
 import com.lak.ai.enums.SessionStatus;
-import lombok.RequiredArgsConstructor;
+import com.lak.ai.mapper.ChatSessionMapper;
+import com.lak.ai.model.entity.ChatSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -13,19 +14,23 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 会话管理器 — Redis Hash 持久化，TTL 30 分钟。
+ * 会话管理器 — Redis Hash + MySQL 双写，Redis 用于热数据，MySQL 用于关联查询。
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SessionManager {
 
     private static final String SESSION_KEY_PREFIX = "session:";
     private static final Duration SESSION_TTL = Duration.ofSeconds(1800);
 
     private final StringRedisTemplate redisTemplate;
+    private final ChatSessionMapper sessionMapper;
 
-    // Redis Hash 字段名
+    public SessionManager(StringRedisTemplate redisTemplate, ChatSessionMapper sessionMapper) {
+        this.redisTemplate = redisTemplate;
+        this.sessionMapper = sessionMapper;
+    }
+
     private static final String FIELD_USER_ID = "userId";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_INTENT_TYPE = "intentType";
@@ -33,9 +38,6 @@ public class SessionManager {
     private static final String FIELD_CREATE_TIME = "createTime";
     private static final String FIELD_LAST_ACTIVE = "lastActive";
 
-    /**
-     * 创建新会话，返回 sessionId。
-     */
     public String create(Long userId) {
         String sessionId = UUID.randomUUID().toString();
         String key = sessionKey(sessionId);
@@ -46,6 +48,12 @@ public class SessionManager {
         hash.put(key, FIELD_CREATE_TIME, now);
         hash.put(key, FIELD_LAST_ACTIVE, now);
         redisTemplate.expire(key, SESSION_TTL);
+        // MySQL 双写 — 支撑 TicketAdapter.queryUserTickets 的关联查询
+        ChatSession entity = new ChatSession();
+        entity.setSessionId(sessionId);
+        entity.setUserId(userId);
+        entity.setStatus(SessionStatus.NEW.name());
+        sessionMapper.insert(entity);
         log.debug("会话创建, sessionId={}, userId={}", sessionId, userId);
         return sessionId;
     }
