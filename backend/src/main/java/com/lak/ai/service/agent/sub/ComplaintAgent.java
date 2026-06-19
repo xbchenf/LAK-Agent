@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 public class ComplaintAgent implements SubAgent {
 
     private static final String GUIDE_TEMPLATE = """
-            如需投诉或建议，请前往 <a href="/tickets" target="_blank">投诉建议</a> 页面填写工单，我们会尽快处理。
+            如需投诉或建议，请点击 <a href="/tickets">投诉建议</a> 页面填写工单，我们会尽快处理。\n\n您也可以直接在工单页面查看历史工单的处理进度。
 
             您也可以直接在工单页面查看历史工单的处理进度。
             """;
