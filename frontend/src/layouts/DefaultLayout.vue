@@ -31,11 +31,14 @@ function newChat() {
 }
 
 async function deleteSession(sid: string) {
-  try {
-    await request.delete(`/chat/sessions/${sid}`)
-    if (chat.currentSessionId === sid) { chat.clearMessages() }
-    await loadSessions()
-  } catch { /* 忽略删除错误 */ }
+  
+  const resp = await fetch(`/api/v1/chat/sessions/${sid}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${auth.accessToken}` }
+  })
+  
+  if (chat.currentSessionId === sid) { chat.clearMessages() }
+  loadSessions()
 }
 
 function logout() { auth.logout(); router.push('/login') }

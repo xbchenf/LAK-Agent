@@ -106,6 +106,13 @@ public class SessionManager {
      */
     public void close(String sessionId) {
         transition(sessionId, SessionStatus.CLOSED);
+        // 同步更新 MySQL — 确保列表查询不再显示
+        var entity = new ChatSession();
+        entity.setSessionId(sessionId);
+        entity.setStatus(SessionStatus.CLOSED.name());
+        sessionMapper.update(entity,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ChatSession>()
+                        .eq(ChatSession::getSessionId, sessionId));
         log.debug("会话关闭, sessionId={}", sessionId);
     }
 
@@ -120,6 +127,7 @@ public class SessionManager {
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
         var wrapper = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ChatSession>()
                 .eq(ChatSession::getUserId, userId)
+                .ne(ChatSession::getStatus, "CLOSED")
                 .orderByDesc(ChatSession::getCreateTime);
         var result = sessionMapper.selectPage(mpPage, wrapper);
         List<SessionVO> records = result.getRecords().stream()
