@@ -21,17 +21,19 @@ instance.interceptors.response.use(
   (response) => {
     const { code, message, data } = response.data as ApiResponse
     if (code !== 200) {
-      if (code === 401) {
-        useAuthStore().logout()
-      }
       ElMessage.error(message || '请求失败')
       return Promise.reject(new Error(message))
     }
     return data as any
   },
   (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore().logout()
+    const status = error.response?.status
+    if (status === 401) {
+      const url = error.config?.url || ''
+      // 仅核心接口401才触发登出，避免查询类接口误踢
+      if (url.includes('/chat/message') || url.includes('/auth/refresh')) {
+        useAuthStore().logout()
+      }
     }
     ElMessage.error(error.message || '网络异常')
     return Promise.reject(error)
