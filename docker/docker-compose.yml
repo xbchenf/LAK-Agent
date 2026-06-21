@@ -1,0 +1,97 @@
+# =============================================================================
+# LAK-Agent 开发环境 — Docker Compose 编排
+# 启动: docker compose up -d
+# 停止: docker compose down
+# 清空数据: docker compose down -v
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ===== MySQL 8.0 — 业务数据 + 审计日志 =====
+  mysql:
+    image: mysql:8.0
+    container_name: lak-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev_2026}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-lak_ai_platform}
+      MYSQL_USER: ${MYSQL_USER:-lak_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-lak_dev_2026}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_dev_2026}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+
+  # ===== Redis 7 — 会话 + 限流 =====
+  redis:
+    image: redis:7-alpine
+    container_name: lak-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy volatile-lru
+
+  # ===== Qdrant — 向量数据库（混合检索） =====
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: lak-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_REST_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===== MinIO — 文件存储（文档附件） =====
+  minio:
+    image: minio/minio:latest
+    container_name: lak-minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lak_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lak_dev_2026}
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql-data:
+  redis-data:
+  qdrant-data:
+  minio-data:
