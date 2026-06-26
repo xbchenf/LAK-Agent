@@ -33,7 +33,22 @@ const rules: FormRules = {
   ],
 }
 
-onMounted(() => loadMyTickets())
+onMounted(() => {
+  loadMyTickets()
+  // 检查是否有从对话窗口传来的预填数据
+  const raw = sessionStorage.getItem('ticket_prefill')
+  if (raw) {
+    try {
+      const prefill = JSON.parse(raw)
+      if (prefill.complaintType) form.value.complaintType = prefill.complaintType
+      if (prefill.contactName) form.value.contactName = prefill.contactName
+      if (prefill.contactPhone) form.value.contactPhone = prefill.contactPhone
+      if (prefill.description) form.value.description = prefill.description
+      showCreate.value = true
+    } catch { /* ignore */ }
+    sessionStorage.removeItem('ticket_prefill')
+  }
+})
 
 async function loadMyTickets() {
   try {

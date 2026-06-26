@@ -117,7 +117,7 @@ public class DocumentParser {
     private String runRapidOcr(Path imageFile) throws IOException {
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                    "rapidocr", "--image_path", imageFile.toAbsolutePath().toString()
+                    "rapidocr", "-img", imageFile.toAbsolutePath().toString()
             );
             pb.redirectErrorStream(true);
             Process process = pb.start();

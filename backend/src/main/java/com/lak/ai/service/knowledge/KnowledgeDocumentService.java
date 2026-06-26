@@ -22,7 +22,6 @@ import dev.langchain4j.store.embedding.filter.Filter;
 import dev.langchain4j.store.embedding.filter.MetadataFilterBuilder;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -45,10 +44,12 @@ import java.util.stream.Collectors;
  * 支持文档上传、列表查询、详情、编辑、状态变更（发布/停用/重新启用）、
  * 删除、分块详情查看、重新索引等操作。上传流程：文件存储 → 解析 → 分块
  * → 入库 MySQL；发布时额外写入 Qdrant 向量库。
+ * <p>
+ * 注意：显式构造函数确保 @Qualifier 注解在构造器参数上正确生效，
+ * 避免 Lombok @RequiredArgsConstructor 可能丢失限定符导致注入错误的 Bean。
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class KnowledgeDocumentService {
 
     private final KnowledgeDocumentMapper documentMapper;
@@ -56,8 +57,25 @@ public class KnowledgeDocumentService {
     private final DocumentParser documentParser;
     private final DocumentChunker documentChunker;
     private final EmbeddingService embeddingService;
-    private final @Qualifier("policyEmbeddingStore") QdrantEmbeddingStore policyEmbeddingStore;
-    private final @Qualifier("procedureEmbeddingStore") QdrantEmbeddingStore procedureEmbeddingStore;
+    private final QdrantEmbeddingStore policyEmbeddingStore;
+    private final QdrantEmbeddingStore procedureEmbeddingStore;
+
+    public KnowledgeDocumentService(
+            KnowledgeDocumentMapper documentMapper,
+            LocalFileStorageService fileStorageService,
+            DocumentParser documentParser,
+            DocumentChunker documentChunker,
+            EmbeddingService embeddingService,
+            @Qualifier("policyEmbeddingStore") QdrantEmbeddingStore policyEmbeddingStore,
+            @Qualifier("procedureEmbeddingStore") QdrantEmbeddingStore procedureEmbeddingStore) {
+        this.documentMapper = documentMapper;
+        this.fileStorageService = fileStorageService;
+        this.documentParser = documentParser;
+        this.documentChunker = documentChunker;
+        this.embeddingService = embeddingService;
+        this.policyEmbeddingStore = policyEmbeddingStore;
+        this.procedureEmbeddingStore = procedureEmbeddingStore;
+    }
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final AtomicInteger SEQ = new AtomicInteger(1);

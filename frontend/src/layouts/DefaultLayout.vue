@@ -13,7 +13,11 @@ const chat = useChatStore()
 interface SessionBrief { sessionId: string; status: string; intentType: string; createTime: string }
 const sessions = ref<SessionBrief[]>([])
 
-onMounted(() => loadSessions())
+onMounted(async () => {
+  await auth.restore()    // 刷新后从服务端恢复用户状态
+  if (!auth.userId) { router.push('/login'); return }
+  loadSessions()
+})
 
 // 登录/登出时重新加载会话列表
 watch(() => auth.accessToken, (val) => {

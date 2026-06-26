@@ -48,12 +48,17 @@ public class ChatController {
     private ApiResponse<Map<String, Object>> handleJson(ChatMessageDTO dto, Long userId) {
         ChatResult result = chatService.processMessage(userId, dto.getSessionId(), dto.getMessage());
         if (result.error()) return ApiResponse.error(404, result.errorMessage());
-        return ApiResponse.success(Map.of(
-                "sessionId", result.sessionId(), "answer", result.response().getAnswer(),
-                "sources", result.response().getSources() != null
-                        ? result.response().getSources() : java.util.Collections.emptyList(),
-                "confidence", result.response().getConfidence(),
-                "intentType", result.response().getIntentType()));
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("sessionId", result.sessionId());
+        data.put("answer", result.response().getAnswer());
+        data.put("sources", result.response().getSources() != null
+                ? result.response().getSources() : java.util.Collections.emptyList());
+        data.put("confidence", result.response().getConfidence());
+        data.put("intentType", result.response().getIntentType());
+        if (result.response().getExtra() != null && !result.response().getExtra().isEmpty()) {
+            data.put("extra", result.response().getExtra());
+        }
+        return ApiResponse.success(data);
     }
 
     /**

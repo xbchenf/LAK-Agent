@@ -6,7 +6,6 @@ import com.lak.ai.model.entity.KnowledgeDocument;
 import dev.langchain4j.store.embedding.filter.Filter;
 import dev.langchain4j.store.embedding.filter.MetadataFilterBuilder;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,12 +23,20 @@ import java.util.List;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class DocumentExpiryScheduler {
 
     private final KnowledgeDocumentMapper documentMapper;
-    private final @Qualifier("policyEmbeddingStore") QdrantEmbeddingStore policyEmbeddingStore;
-    private final @Qualifier("procedureEmbeddingStore") QdrantEmbeddingStore procedureEmbeddingStore;
+    private final QdrantEmbeddingStore policyEmbeddingStore;
+    private final QdrantEmbeddingStore procedureEmbeddingStore;
+
+    public DocumentExpiryScheduler(
+            KnowledgeDocumentMapper documentMapper,
+            @Qualifier("policyEmbeddingStore") QdrantEmbeddingStore policyEmbeddingStore,
+            @Qualifier("procedureEmbeddingStore") QdrantEmbeddingStore procedureEmbeddingStore) {
+        this.documentMapper = documentMapper;
+        this.policyEmbeddingStore = policyEmbeddingStore;
+        this.procedureEmbeddingStore = procedureEmbeddingStore;
+    }
 
     /**
      * 每小时整点执行（启动后延迟 10 秒首次执行）。
