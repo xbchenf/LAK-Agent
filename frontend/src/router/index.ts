@@ -24,9 +24,37 @@ const router = createRouter({
           component: () => import('@/views/TicketView.vue'),
         },
         {
+          path: 'knowledge',
+          name: 'knowledge',
+          component: () => import('@/views/knowledge/KnowledgeView.vue'),
+        },
+        {
+          path: 'knowledge/:docId',
+          name: 'knowledge-detail',
+          component: () => import('@/views/knowledge/KnowledgeDetail.vue'),
+        },
+        {
           path: 'admin',
           name: 'admin',
           component: () => import('@/views/admin/AdminView.vue'),
+          meta: { role: 'ADMIN' },
+        },
+        {
+          path: 'admin/roles',
+          name: 'admin-roles',
+          component: () => import('@/views/admin/RoleManageView.vue'),
+          meta: { role: 'ADMIN' },
+        },
+        {
+          path: 'admin/users',
+          name: 'admin-users',
+          component: () => import('@/views/admin/UserManageView.vue'),
+          meta: { role: 'ADMIN' },
+        },
+        {
+          path: 'admin/audit',
+          name: 'admin-audit',
+          component: () => import('@/views/admin/AuditLogView.vue'),
           meta: { role: 'ADMIN' },
         },
       ],

@@ -48,7 +48,7 @@ instance.interceptors.response.use(
     const status = error.response?.status
 
     // 401 → 尝试刷新 Token
-    if (status === 401 && !original._retry && !original.url?.includes('/auth/refresh')) {
+    if (status === 401 && !original._retry && !original.url?.includes('/auth/refresh') && !original.url?.includes('/auth/login')) {
       original._retry = true
 
       if (!isRefreshing) {
@@ -78,7 +78,8 @@ instance.interceptors.response.use(
       })
     }
 
-    ElMessage.error(error.message || '网络异常')
+    const backendMsg = error.response?.data?.message
+ElMessage.error(backendMsg || error.message || '网络异常')
     return Promise.reject(error)
   }
 )

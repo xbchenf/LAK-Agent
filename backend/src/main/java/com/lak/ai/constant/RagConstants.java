@@ -12,7 +12,7 @@ public final class RagConstants {
     public static final String COLLECTION_PROCEDURE = "lak_procedure_docs";
 
     /** 向量维度 */
-    public static final int EMBEDDING_DIMENSION = 1536;
+    public static final int EMBEDDING_DIMENSION = 1024;
 
     /** 混合检索参数 */
     public static final int DENSE_TOP_K = 10;

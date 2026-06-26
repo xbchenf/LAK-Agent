@@ -3,6 +3,7 @@ target/
 *.class
 *.jar
 *.war
+**/maven-repository/
 
 # === IDE ===
 .idea/
@@ -27,6 +28,9 @@ Thumbs.db
 # === Docker volumes ===
 docker/data/
 
+# === File storage (dev) ===
+backend/data/files/
+
 # === Harness audit logs ===
 .claude/hook-logs/*.log
 .claude/hook-logs/*.txt
@@ -34,3 +38,25 @@ docker/data/
 # === Frontend ===
 frontend/node_modules/
 frontend/dist/
+
+# === Security — 敏感文件不提交 ===
+config/sensitive-words.txt
+*.pem
+*.key
+*.p12
+*.jks
+
+# === Bash crash dumps ===
+bash.exe.stackdump
+
+# === Temp files ===
+*.tmp
+*.bak
+
+# === Harness session data (不提交 AI 协作过程数据) ===
+.claude/hook-logs/
+.claude/projects/
+.claude/plans/
+.claude/scheduled_tasks.json
+frontend/node_modules/
+backend/target/

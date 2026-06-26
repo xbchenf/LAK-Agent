@@ -5,9 +5,9 @@
 spring:
   # ---- MySQL 8.0 — 业务数据 + 审计日志 ----
   datasource:
-    url: jdbc:mysql://localhost:3306/lak_ai_platform?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3307/lak_ai_platform?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
-    password: root
+    password: root_dev_2026
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
@@ -20,7 +20,7 @@ spring:
   data:
     redis:
       host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      port: ${REDIS_PORT:6380}
       password: ${REDIS_PASSWORD:}
       database: 0
       lettuce:
@@ -57,7 +57,11 @@ logging:
 lak:
   jwt:
     secret: dev-only-local-jwt-secret-key-32bytes!!
+  storage:
+    local-path: ./data/files
   cors:
     allowed-origins: http://localhost:5173
   sensitive-words:
     path: config/sensitive-words.txt
+  test-data:
+    load-on-startup: false

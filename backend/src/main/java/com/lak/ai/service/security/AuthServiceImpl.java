@@ -2,9 +2,11 @@ package com.lak.ai.service.security;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.lak.ai.common.exception.AuthException;
+import com.lak.ai.mapper.SysRoleMapper;
 import com.lak.ai.mapper.SysUserMapper;
 import com.lak.ai.model.dto.LoginDTO;
 import com.lak.ai.model.dto.RefreshTokenDTO;
+import com.lak.ai.model.entity.SysRole;
 import com.lak.ai.model.entity.SysUser;
 import com.lak.ai.model.vo.LoginVO;
 import io.jsonwebtoken.Claims;
@@ -23,6 +25,7 @@ import java.util.List;
 public class AuthServiceImpl implements AuthService {
 
     private final SysUserMapper sysUserMapper;
+    private final SysRoleMapper sysRoleMapper;
     private final JwtService jwtService;
     private final CaptchaService captchaService;
     private final PasswordEncoder passwordEncoder;
@@ -53,7 +56,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 5. 签发 Token
-        List<String> roles = List.of("USER"); // 简化——后续从 sys_role 关联查询
+        List<String> roles = resolveRoles(user.getRoleId());
         String accessToken = jwtService.generateAccessToken(user.getId(), user.getUsername(), roles);
         String refreshToken = jwtService.generateRefreshToken(user.getId(), user.getUsername());
 
@@ -98,7 +101,7 @@ public class AuthServiceImpl implements AuthService {
         // 废弃旧 Refresh Token（防重放攻击）
         revokeToken(dto.getRefreshToken(), claims);
 
-        List<String> roles = List.of("USER");
+        List<String> roles = resolveRoles(user.getRoleId());
         String accessToken = jwtService.generateAccessToken(userId, username, roles);
         String refreshToken = jwtService.generateRefreshToken(userId, username);
 
@@ -126,6 +129,16 @@ public class AuthServiceImpl implements AuthService {
             redisTemplate.opsForValue().set("token:revoked:" + hash, "1",
                     Duration.ofMillis(remaining));
         }
+    }
+
+    /**
+     * 从 sys_role 解析角色代码列表。
+     */
+    private List<String> resolveRoles(Long roleId) {
+        if (roleId == null) return List.of("USER");
+        SysRole role = sysRoleMapper.selectById(roleId);
+        if (role == null) return List.of("USER");
+        return role.getRoleCode() != null ? List.of(role.getRoleCode()) : List.of("USER");
     }
 
     private String tokenHash(String token) {

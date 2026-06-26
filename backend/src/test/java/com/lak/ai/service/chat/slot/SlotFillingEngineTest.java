@@ -3,6 +3,7 @@ package com.lak.ai.service.chat.slot;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lak.ai.enums.SessionStatus;
 import com.lak.ai.service.chat.session.SessionManager;
+import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,7 @@ class SlotFillingEngineTest {
     @Mock private SessionManager sessionManager;
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private HashOperations<String, Object, Object> hashOperations;
+    @Mock private ChatModel chatModel;
 
     private SlotFillingEngine engine;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -33,7 +35,7 @@ class SlotFillingEngineTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         when(redisTemplate.opsForHash()).thenReturn(hashOperations);
-        engine = new SlotFillingEngine(sessionManager, redisTemplate, objectMapper);
+        engine = new SlotFillingEngine(sessionManager, redisTemplate, objectMapper, chatModel);
     }
 
     @Test

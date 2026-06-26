@@ -21,6 +21,23 @@ public class MybatisPlusConfig {
      * 审计日志表名前缀。
      */
     private static final String AUDIT_LOG_PREFIX = "audit_log";
+    private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("yyyyMM");
+
+    /**
+     * 审计日志查询时，可通过此 ThreadLocal 覆盖目标月份（如 "202606"）。
+     * 设置后在 Service 层 finally 块中必须清理。
+     */
+    private static final ThreadLocal<String> AUDIT_MONTH_SUFFIX = new ThreadLocal<>();
+
+    /** 设置审计日志查询目标月份（yyyyMM），查询前调用。 */
+    public static void setAuditMonth(String monthSuffix) {
+        AUDIT_MONTH_SUFFIX.set(monthSuffix);
+    }
+
+    /** 清理审计日志月份覆盖，查询后调用。 */
+    public static void clearAuditMonth() {
+        AUDIT_MONTH_SUFFIX.remove();
+    }
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
@@ -30,7 +47,11 @@ public class MybatisPlusConfig {
         DynamicTableNameInnerInterceptor dynamicTableName = new DynamicTableNameInnerInterceptor();
         dynamicTableName.setTableNameHandler((sql, tableName) -> {
             if (AUDIT_LOG_PREFIX.equals(tableName)) {
-                return AUDIT_LOG_PREFIX + "_" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
+                String suffix = AUDIT_MONTH_SUFFIX.get();
+                if (suffix != null) {
+                    return AUDIT_LOG_PREFIX + "_" + suffix;
+                }
+                return AUDIT_LOG_PREFIX + "_" + LocalDate.now().format(MONTH_FMT);
             }
             return tableName;
         });

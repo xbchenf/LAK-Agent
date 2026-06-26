@@ -30,10 +30,11 @@ public class PolicyAgent implements SubAgent {
     public AgentResponse process(AgentRequest request) {
         try {
             // Step 1: 强制检索（代码层面，不依赖 LLM）
-            String docs = tools.search(request.getMessage());
+            PolicyAgentTools.SearchResult sr = tools.search(request.getMessage());
             // Step 2: LLM 基于检索资料生成（检索结果注入 Prompt）
-            String answer = agentService.answer(request.getMessage(), docs);
+            String answer = agentService.answer(request.getMessage(), sr.formattedText());
             return AgentResponse.builder().answer(answer).confidence(0.9)
+                    .sources(sr.sources())
                     .intentType(IntentType.POLICY_CONSULT.name()).build();
         } catch (Exception e) {
             log.error("PolicyAgent 处理失败", e);

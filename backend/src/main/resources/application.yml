@@ -14,9 +14,6 @@ spring:
   profiles:
     active: dev
 
-  # ---- 字符编码 ----
-  mandatory-file-encoding: UTF-8
-
   # ---- Jackson 序列化 ----
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss

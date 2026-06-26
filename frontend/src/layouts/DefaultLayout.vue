@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -13,7 +13,21 @@ const chat = useChatStore()
 interface SessionBrief { sessionId: string; status: string; intentType: string; createTime: string }
 const sessions = ref<SessionBrief[]>([])
 
-onMounted(() => loadSessions())
+onMounted(async () => {
+  await auth.restore()    // 刷新后从服务端恢复用户状态
+  if (!auth.userId) { router.push('/login'); return }
+  loadSessions()
+})
+
+// 登录/登出时重新加载会话列表
+watch(() => auth.accessToken, (val) => {
+  if (val) {
+    loadSessions()
+  } else {
+    sessions.value = []
+    chat.clearMessages()
+  }
+})
 
 async function loadSessions() {
   try { const data = await request.get('/chat/sessions?page=1&size=50') as any; sessions.value = data.records || [] }
@@ -69,10 +83,10 @@ const intentLabel: Record<string, string> = {
       </div>
 
       <nav class="sidebar-nav">
-        <a class="nav-item" :class="{ active: route.path === '/' }" @click="router.push('/')">💬 智能问答</a>
-        <a class="nav-item" :class="{ active: route.path === '/tickets' }" @click="router.push('/tickets')">📋 投诉建议</a>
-        <a v-if="auth.roles?.includes('ADMIN')" class="nav-item"
-           :class="{ active: route.path === '/admin' }" @click="router.push('/admin')">⚙ 系统管理</a>
+        <a v-if="auth.menuCodes.includes('chat')" class="nav-item" :class="{ active: route.path === '/' }" @click="router.push('/')">💬 智能问答</a>
+        <a v-if="auth.menuCodes.includes('ticket')" class="nav-item" :class="{ active: route.path === '/tickets' }" @click="router.push('/tickets')">📋 投诉建议</a>
+        <a v-if="auth.menuCodes.includes('admin')" class="nav-item"
+           :class="{ active: route.path.startsWith('/admin') || route.path.startsWith('/knowledge') }" @click="router.push('/admin')">⚙ 系统管理</a>
       </nav>
 
       <div class="session-list">

@@ -29,6 +29,8 @@ public class HybridRetriever {
     private static final int DENSE_TOP_K = 10;
     private static final int FUSION_TOP_K = 5;
     private static final double SIMILARITY_THRESHOLD = 0.75;
+    /** 粗排阶段使用较低的阈值，让关键词加权有机会补救边缘 case */
+    private static final double DENSE_MIN_SCORE = 0.55;
 
     private final EmbeddingService embeddingService;
     private final Map<String, QdrantEmbeddingStore> stores;
@@ -64,7 +66,7 @@ public class HybridRetriever {
                     EmbeddingSearchRequest.builder()
                             .queryEmbedding(queryEmbedding)
                             .maxResults(DENSE_TOP_K)
-                            .minScore(SIMILARITY_THRESHOLD)
+                            .minScore(DENSE_MIN_SCORE)  // 宽松粗排，精排阶段用关键词加权 + 0.75 阈值
                             .build()
             ).matches();
 

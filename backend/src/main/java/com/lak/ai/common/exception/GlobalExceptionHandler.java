@@ -2,6 +2,7 @@ package com.lak.ai.common.exception;
 
 import com.lak.ai.common.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import com.lak.ai.common.exception.KnowledgeException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -75,6 +76,21 @@ public class GlobalExceptionHandler {
         log.error("大模型异常, code={}, message={}", e.getCode(), e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(ApiResponse.error(e.getCode(), e.getMessage()));
+    }
+
+    @ExceptionHandler(KnowledgeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleKnowledgeException(KnowledgeException e) {
+        log.warn("知识库异常, code={}, message={}", e.getCode(), e.getMessage());
+        HttpStatus status = mapKnowledgeHttpStatus(e.getCode());
+        return ResponseEntity.status(status)
+                .body(ApiResponse.error(e.getCode(), e.getMessage()));
+    }
+
+    private HttpStatus mapKnowledgeHttpStatus(int code) {
+        if (code == 4_401 || code == 4_404) return HttpStatus.BAD_REQUEST;
+        if (code == 4_403) return HttpStatus.NOT_FOUND;
+        if (code == 4_405 || code == 4_406 || code == 4_402) return HttpStatus.INTERNAL_SERVER_ERROR;
+        return HttpStatus.INTERNAL_SERVER_ERROR;
     }
 
     // ===== 参数校验异常 =====

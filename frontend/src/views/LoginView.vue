@@ -4,6 +4,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { login, getCaptcha } from '@/api/auth'
+import { getMyMenus } from '@/api/admin'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -45,7 +46,16 @@ async function submit() {
   try {
     const result = await login({ ...form, captchaKey: captchaKey.value })
     auth.setAuth(result)
-    router.push('/')
+    // 获取用户可访问的菜单
+    try {
+      const codes = await getMyMenus()
+      auth.setMenuCodes(codes)
+      // 按优先级跳转第一个可用菜单
+      if (codes.includes('chat')) router.push('/')
+      else if (codes.includes('ticket')) router.push('/tickets')
+      else if (codes.includes('admin')) router.push('/admin')
+      else router.push('/')
+    } catch { auth.setMenuCodes([]); router.push('/') }
   } catch { /* handled by interceptor */ }
   finally { loading.value = false }
 }

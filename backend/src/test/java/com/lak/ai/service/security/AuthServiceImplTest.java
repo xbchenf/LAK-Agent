@@ -29,6 +29,7 @@ import static org.mockito.Mockito.*;
 class AuthServiceImplTest {
 
     @Mock private SysUserMapper sysUserMapper;
+    @Mock private com.lak.ai.mapper.SysRoleMapper sysRoleMapper;
     @Mock private JwtService jwtService;
     @Mock private CaptchaService captchaService;
     @Mock private PasswordEncoder passwordEncoder;
@@ -40,7 +41,7 @@ class AuthServiceImplTest {
     @BeforeEach
     void setUp() {
         authService = new AuthServiceImpl(
-                sysUserMapper, jwtService, captchaService, passwordEncoder, redisTemplate);
+                sysUserMapper, sysRoleMapper, jwtService, captchaService, passwordEncoder, redisTemplate);
     }
 
     // ===== Login Tests =====

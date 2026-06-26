@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * 文本向量化服务 — 调用百炼 text-embedding-v4。
  * <p>
- * 输出: 1536维 Dense Vector。
+ * 输出: 1024维 Dense Vector。
  */
 @Slf4j
 @Service
@@ -37,7 +37,7 @@ public class EmbeddingService {
      * 获取向量维度。
      */
     public int dimension() {
-        return 1536;
+        return embeddingModel.dimension();
     }
 
     private float[] toFloatArray(List<Float> floats) {

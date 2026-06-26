@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -20,18 +21,25 @@ public class PolicyAgentTools {
     private final HybridRetriever retriever;
     private final SourceTracer tracer;
 
-    public String search(String query) {
+    /** 检索结果 — 同时包含注入LLM的格式化文本和前端展示的结构化溯源 */
+    public record SearchResult(String formattedText, List<Map<String, Object>> sources) {}
+
+    public SearchResult search(String query) {
         List<RagFragment> fragments = retriever.search(query, RagConstants.COLLECTION_POLICY);
         if (fragments.isEmpty()) {
-            return "未检索到相关政策法规资料。";
+            return new SearchResult("未检索到相关政策法规资料。", List.of());
         }
-        List<SourceTracer.SourceCitation> sources = tracer.buildCitations(fragments);
-        return sources.stream()
+        List<SourceTracer.SourceCitation> citations = tracer.buildCitations(fragments);
+        String formatted = citations.stream()
                 .map(s -> String.format("【%s 第%s条】（生效: %s）\n%s",
                         s.sourceNo() != null ? s.sourceNo() : s.docTitle(),
                         s.articleNo() != null ? s.articleNo() : "?",
                         s.effectiveDate() != null ? s.effectiveDate() : "未知",
                         s.fragment()))
                 .collect(Collectors.joining("\n\n---\n\n"));
+        List<Map<String, Object>> sourceMaps = citations.stream()
+                .map(SourceTracer.SourceCitation::toMap)
+                .collect(Collectors.toList());
+        return new SearchResult(formatted, sourceMaps);
     }
 }
