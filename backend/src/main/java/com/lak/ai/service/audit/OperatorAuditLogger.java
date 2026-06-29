@@ -20,14 +20,14 @@ public class OperatorAuditLogger {
     private final AuditLogMapper auditLogMapper;
 
     public void log(String sessionId, Long userId, String operation, String detail) {
-        AuditLog log = new AuditLog();
-        log.setTraceId(UUID.randomUUID().toString().replace("-", "").substring(0, 32));
-        log.setSessionId(sessionId);
-        log.setUserId(userId);
-        log.setOperation(operation);
-        log.setRequestBody(detail);
-        log.setStatus("SUCCESS");
-        log.setLatencyMs(0);
-        auditLogMapper.insert(log);
+        AuditLog audit = new AuditLog();
+        audit.setTraceId(UUID.randomUUID().toString().replace("-", "").substring(0, 32));
+        audit.setSessionId(sessionId);
+        audit.setUserId(userId);
+        audit.setIntentType(operation);  // 复用 intentType 字段存操作类型
+        audit.setRequestBody(detail);
+        audit.setStatus("SUCCESS");
+        audit.setLatencyMs(0);
+        auditLogMapper.insert(audit);
     }
 }

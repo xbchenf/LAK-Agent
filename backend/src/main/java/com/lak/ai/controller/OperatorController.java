@@ -93,6 +93,10 @@ public class OperatorController {
      */
     @PostMapping("/tickets/{ticketNo}/claim")
     public ApiResponse<Ticket> claimTicket(@PathVariable String ticketNo, HttpServletRequest request) {
+        java.util.List<String> roles = extractRoles(request);
+        if (roles == null || (!roles.contains("ADMIN") && !roles.contains("OPERATOR"))) {
+            return ApiResponse.error(403, "无权限");
+        }
         Long userId = (Long) request.getAttribute("userId");
         try {
             return ApiResponse.success(operatorTicketService.claim(ticketNo, userId));
@@ -193,6 +197,10 @@ public class OperatorController {
     @PostMapping("/sessions/{sessionId}/takeover")
     public ApiResponse<Map<String, Object>> takeoverSession(@PathVariable String sessionId,
                                                              HttpServletRequest request) {
+        java.util.List<String> roles = extractRoles(request);
+        if (roles == null || (!roles.contains("ADMIN") && !roles.contains("OPERATOR"))) {
+            return ApiResponse.error(403, "无权限");
+        }
         Long userId = (Long) request.getAttribute("userId");
         try {
             var result = operatorChatService.takeover(sessionId, userId);
