@@ -17,6 +17,9 @@ public enum IntentType {
     /** 投诉建议 */
     COMPLAINT_SUGGEST("投诉建议", "agent-complaint"),
 
+    /** 请求转人工坐席 */
+    REQUEST_HUMAN("请求转人工", null),
+
     /** 闲聊 / 无关话题 */
     CHITCHAT("闲聊", null),
 

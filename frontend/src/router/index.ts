@@ -57,6 +57,27 @@ const router = createRouter({
           component: () => import('@/views/admin/AuditLogView.vue'),
           meta: { role: 'ADMIN' },
         },
+        {
+          path: 'admin/sensitive',
+          name: 'admin-sensitive',
+          component: () => import('@/views/admin/SensitiveWordView.vue'),
+          meta: { role: 'ADMIN' },
+        },
+        {
+          path: 'operator',
+          name: 'operator',
+          component: () => import('@/views/operator/OperatorDashboard.vue'),
+        },
+        {
+          path: 'operator/tickets/:ticketNo',
+          name: 'operator-ticket',
+          component: () => import('@/views/operator/OperatorTicketDetail.vue'),
+        },
+        {
+          path: 'operator/chat/:sessionId',
+          name: 'operator-chat',
+          component: () => import('@/views/operator/OperatorChatView.vue'),
+        },
       ],
     },
   ],

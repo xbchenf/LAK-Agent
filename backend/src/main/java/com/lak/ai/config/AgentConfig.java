@@ -1,5 +1,6 @@
 package com.lak.ai.config;
 
+import com.lak.ai.service.agent.master.HandoffSummaryService;
 import com.lak.ai.service.agent.master.IntentService;
 import com.lak.ai.service.agent.sub.PolicyAgentService;
 import com.lak.ai.service.agent.sub.ProcedureAgentService;
@@ -54,6 +55,11 @@ public class AgentConfig {
     @Bean
     public IntentService intentService(ChatModel chatModel) {
         return AiServices.builder(IntentService.class).chatModel(chatModel).build();
+    }
+
+    @Bean
+    public HandoffSummaryService handoffSummaryService(ChatModel chatModel) {
+        return AiServices.builder(HandoffSummaryService.class).chatModel(chatModel).build();
     }
 
     @Bean

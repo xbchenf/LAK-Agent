@@ -16,13 +16,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 会话管理器 — Redis Hash + MySQL 双写，Redis 用于热数据，MySQL 用于关联查询。
+ * 会话管理器 — Redis Hash + MySQL 双写。
  */
 @Slf4j
 @Service
 public class SessionManager {
 
     private static final String SESSION_KEY_PREFIX = "session:";
+    private static final String QUEUE_KEY = "queue:operator_waiting";
     private static final Duration SESSION_TTL = Duration.ofSeconds(1800);
 
     private final StringRedisTemplate redisTemplate;
@@ -39,6 +40,10 @@ public class SessionManager {
     private static final String FIELD_CONFIDENCE = "confidence";
     private static final String FIELD_CREATE_TIME = "createTime";
     private static final String FIELD_LAST_ACTIVE = "lastActive";
+    private static final String FIELD_PENDING_HANDOFF = "pendingHandoff";
+    private static final String FIELD_TRANSFER_REASON = "transferReason";
+
+    // ==================== 基础操作 ====================
 
     public String create(Long userId) {
         String sessionId = UUID.randomUUID().toString();
@@ -50,7 +55,6 @@ public class SessionManager {
         hash.put(key, FIELD_CREATE_TIME, now);
         hash.put(key, FIELD_LAST_ACTIVE, now);
         redisTemplate.expire(key, SESSION_TTL);
-        // MySQL 双写 — 支撑 TicketAdapter.queryUserTickets 的关联查询
         ChatSession entity = new ChatSession();
         entity.setSessionId(sessionId);
         entity.setUserId(userId);
@@ -60,18 +64,12 @@ public class SessionManager {
         return sessionId;
     }
 
-    /**
-     * 更新会话状态并刷新 TTL。
-     */
     public void transition(String sessionId, SessionStatus newStatus) {
         HashOperations<String, String, String> hash = redisTemplate.opsForHash();
         hash.put(sessionKey(sessionId), FIELD_STATUS, newStatus.name());
         touch(sessionId);
     }
 
-    /**
-     * 更新意图类型和置信度。
-     */
     public void setIntent(String sessionId, String intentType, double confidence) {
         HashOperations<String, String, String> hash = redisTemplate.opsForHash();
         hash.put(sessionKey(sessionId), FIELD_INTENT_TYPE, intentType);
@@ -79,35 +77,22 @@ public class SessionManager {
         touch(sessionId);
     }
 
-    /**
-     * 获取会话所有字段。
-     */
     public Map<Object, Object> getAll(String sessionId) {
         return redisTemplate.opsForHash().entries(sessionKey(sessionId));
     }
 
-    /**
-     * 获取会话状态。
-     */
     public SessionStatus getStatus(String sessionId) {
         String status = (String) redisTemplate.opsForHash().get(sessionKey(sessionId), FIELD_STATUS);
         return status != null ? SessionStatus.valueOf(status) : null;
     }
 
-    /**
-     * 检查会话是否存在且未关闭。
-     */
     public boolean isActive(String sessionId) {
         SessionStatus status = getStatus(sessionId);
         return status != null && status != SessionStatus.CLOSED;
     }
 
-    /**
-     * 关闭会话。
-     */
     public void close(String sessionId) {
         transition(sessionId, SessionStatus.CLOSED);
-        // 同步更新 MySQL — 确保列表查询不再显示
         var entity = new ChatSession();
         entity.setSessionId(sessionId);
         entity.setStatus(SessionStatus.CLOSED.name());
@@ -117,9 +102,85 @@ public class SessionManager {
         log.debug("会话关闭, sessionId={}", sessionId);
     }
 
-    /**
-     * 刷新会话 TTL。
-     */
+    // ==================== 转人工排队 ====================
+
+    /** 入队：返回队列位置 */
+    public int enqueueWaiting(String sessionId, String reason) {
+        HashOperations<String, String, String> hash = redisTemplate.opsForHash();
+        hash.put(sessionKey(sessionId), FIELD_TRANSFER_REASON, reason);
+        hash.put(sessionKey(sessionId), FIELD_STATUS, SessionStatus.WAITING_OPERATOR.name());
+        redisTemplate.opsForList().rightPush(QUEUE_KEY, sessionId);
+        touch(sessionId);
+        return getQueuePosition(sessionId);
+    }
+
+    /** 将指定会话从等待队列移除 */
+    public void dequeueWaiting(String sessionId) {
+        redisTemplate.opsForList().remove(QUEUE_KEY, 0, sessionId);
+    }
+
+    /** 坐席接管会话 — 加入坐席的活跃列表 */
+    public void addToOperatorSessions(String sessionId, Long operatorId) {
+        redisTemplate.opsForSet().add("operator:" + operatorId + ":sessions", sessionId);
+    }
+
+    /** 关闭会话 — 从坐席活跃列表移除 */
+    public void removeFromOperatorSessions(String sessionId, Long operatorId) {
+        redisTemplate.opsForSet().remove("operator:" + operatorId + ":sessions", sessionId);
+    }
+
+    /** 获取坐席当前活跃的会话 */
+    public java.util.Set<String> getOperatorSessions(Long operatorId) {
+        java.util.Set<String> set = redisTemplate.opsForSet().members("operator:" + operatorId + ":sessions");
+        return set != null ? set : java.util.Set.of();
+    }
+
+    /** 获取排队位置（仅统计活跃等待中的会话） */
+    public int getQueuePosition(String sessionId) {
+        List<String> queue = redisTemplate.opsForList().range(QUEUE_KEY, 0, -1);
+        if (queue == null) return 0;
+        int pos = 0;
+        for (String sid : queue) {
+            if (getStatus(sid) == SessionStatus.WAITING_OPERATOR) {
+                pos++;
+                if (sid.equals(sessionId)) return pos;
+            }
+        }
+        return 0;
+    }
+
+    /** 获取排队列表 */
+    public List<String> getWaitingQueue() {
+        List<String> q = redisTemplate.opsForList().range(QUEUE_KEY, 0, -1);
+        return q != null ? q : List.of();
+    }
+
+    // ==================== 待确认转人工 ====================
+
+    public void setPendingHandoff(String sessionId, String triggerType) {
+        HashOperations<String, String, String> hash = redisTemplate.opsForHash();
+        hash.put(sessionKey(sessionId), FIELD_PENDING_HANDOFF, triggerType);
+        touch(sessionId);
+    }
+
+    public boolean hasPendingHandoff(String sessionId) {
+        String val = (String) redisTemplate.opsForHash().get(sessionKey(sessionId), FIELD_PENDING_HANDOFF);
+        return val != null && !val.isBlank();
+    }
+
+    public void clearPendingHandoff(String sessionId) {
+        redisTemplate.opsForHash().delete(sessionKey(sessionId), FIELD_PENDING_HANDOFF);
+    }
+
+    // ==================== 合规标记 ====================
+
+    public void setNeedHumanReview(String sessionId, String reason) {
+        redisTemplate.opsForHash().put(sessionKey(sessionId), "needHumanReview", reason != null ? reason : "true");
+        touch(sessionId);
+    }
+
+    // ==================== 会话历史 ====================
+
     public record SessionPage(List<SessionVO> records, long total) {}
     public record SessionVO(String sessionId, String status, String intentType, String createTime) {}
 
@@ -129,7 +190,6 @@ public class SessionManager {
         try {
             List<ContextMessage> all = new com.fasterxml.jackson.databind.ObjectMapper()
                     .readValue(json, new com.fasterxml.jackson.core.type.TypeReference<>() {});
-            // 去重：连续相同的消息只保留一条
             List<ContextMessage> deduped = new java.util.ArrayList<>();
             for (int i = 0; i < all.size(); i++) {
                 if (i > 0 && all.get(i).getRole().equals(all.get(i-1).getRole())
@@ -153,6 +213,12 @@ public class SessionManager {
                         s.getCreateTime() != null ? s.getCreateTime().toString() : ""))
                 .toList();
         return new SessionPage(records, result.getTotal());
+    }
+
+    /** 设置单个字段 */
+    public void setField(String sessionId, String field, String value) {
+        redisTemplate.opsForHash().put(sessionKey(sessionId), field, value);
+        touch(sessionId);
     }
 
     public void touch(String sessionId) {

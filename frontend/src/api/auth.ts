@@ -19,3 +19,9 @@ export function getCaptcha(): Promise<{ captchaKey: string; captchaText: string 
 export function refreshToken(refreshToken: string): Promise<LoginVO> {
   return request.post('/auth/refresh', { refreshToken }) as any
 }
+
+export function register(params: {
+  username: string; password: string; realName?: string; captchaKey: string; captchaCode: string
+}): Promise<void> {
+  return request.post('/auth/register', params) as any
+}

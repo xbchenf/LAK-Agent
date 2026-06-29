@@ -15,61 +15,64 @@ const emit = defineEmits<{
 
 const router = useRouter()
 
-function viewDetail(docId: string) {
-  router.push(`/knowledge/${docId}`)
-}
+function viewDetail(docId: string) { router.push(`/knowledge/${docId}`) }
 
 function actions(doc: DocumentVO) {
   const acts: { label: string; handler: () => void }[] = []
   acts.push({ label: '查看详情', handler: () => viewDetail(doc.docId) })
-  if (doc.status === 'DRAFT') {
-    acts.push({ label: '发布', handler: () => emit('publish', doc.docId) })
-  }
-  if (doc.status === 'ACTIVE') {
-    acts.push({ label: '停用', handler: () => emit('disable', doc.docId) })
-  }
-  if (doc.status === 'EXPIRED') {
-    acts.push({ label: '重新启用', handler: () => emit('reactivate', doc.docId) })
-  }
+  if (doc.status === 'DRAFT') acts.push({ label: '发布', handler: () => emit('publish', doc.docId) })
+  if (doc.status === 'ACTIVE') acts.push({ label: '停用', handler: () => emit('disable', doc.docId) })
+  if (doc.status === 'EXPIRED') acts.push({ label: '重新启用', handler: () => emit('reactivate', doc.docId) })
   acts.push({ label: '删除', handler: () => emit('delete', doc.docId) })
   return acts
 }
 </script>
 
 <template>
-  <el-table :data="documents" v-loading="loading" stripe style="width:100%">
-    <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-    <el-table-column prop="docType" label="类型" width="100">
-      <template #default="{ row }">
-        <el-tag size="small" type="info">{{ DocTypeLabels[row.docType] || row.docType }}</el-tag>
-      </template>
-    </el-table-column>
-    <el-table-column label="状态" width="90">
-      <template #default="{ row }">
-        <DocumentStatusTag :status="row.status" />
-      </template>
-    </el-table-column>
-    <el-table-column prop="effectiveDate" label="生效日期" width="120" />
-    <el-table-column prop="expireDate" label="过期日期" width="120">
-      <template #default="{ row }">
-        <span :style="{ color: row.expireDate && new Date(row.expireDate) < new Date() ? 'var(--el-color-danger)' : '' }">
-          {{ row.expireDate || '-' }}
-        </span>
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="140" fixed="right">
-      <template #default="{ row }">
-        <el-dropdown trigger="click">
-          <el-button size="small">操作<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item v-for="act in actions(row)" :key="act.label" @click="act.handler">
-                {{ act.label }}
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </template>
-    </el-table-column>
-  </el-table>
+  <div class="doc-table-wrap">
+    <el-table :data="documents" v-loading="loading" stripe style="width:100%">
+      <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
+      <el-table-column prop="docType" label="类型" width="100">
+        <template #default="{ row }">
+          <span class="type-tag">{{ DocTypeLabels[row.docType] || row.docType }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" width="90">
+        <template #default="{ row }">
+          <DocumentStatusTag :status="row.status" />
+        </template>
+      </el-table-column>
+      <el-table-column prop="effectiveDate" label="生效日期" width="120" />
+      <el-table-column prop="expireDate" label="过期日期" width="120">
+        <template #default="{ row }">
+          <span :class="{ 'date-expired': row.expireDate && new Date(row.expireDate) < new Date() }">
+            {{ row.expireDate || '-' }}
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="140" fixed="right">
+        <template #default="{ row }">
+          <el-dropdown trigger="click">
+            <el-button size="small">操作<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-for="act in actions(row)" :key="act.label" @click="act.handler">
+                  {{ act.label }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </template>
+      </el-table-column>
+    </el-table>
+  </div>
 </template>
+
+<style scoped>
+.doc-table-wrap {
+  background: var(--color-bg-white); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--color-border); overflow: hidden;
+}
+.type-tag { font-size: 12px; color: var(--color-text-secondary); }
+.date-expired { color: var(--color-danger); }
+</style>

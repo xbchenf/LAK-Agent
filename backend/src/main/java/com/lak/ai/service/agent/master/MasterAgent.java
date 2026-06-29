@@ -12,8 +12,6 @@ import org.springframework.stereotype.Service;
 
 /**
  * 主Agent — 意图识别 + 置信度评估 + 路由分发。
- * <p>
- * 编排 IntentClassifier → ConfidenceEvaluator → RouteDispatcher → SubAgentScheduler 或 FallbackHandler。
  */
 @Slf4j
 @Service
@@ -32,14 +30,15 @@ public class MasterAgent {
     public RoutingDecisionBO route(AgentRequest request) {
         long start = System.currentTimeMillis();
 
-        // 1. 意图分类
+        // 1. 意图分类（含硬规则前置检测）
         ClassificationResult classification = intentClassifier.classify(request.getMessage());
 
         // 2. 置信度评估
         ConfidenceResult confidence = confidenceEvaluator.evaluate(classification, request.getMessage());
 
-        // 3. 路由分发
-        RoutingDecisionBO decision = routeDispatcher.dispatch(confidence, classification.costMs());
+        // 3. 路由分发（传递 needsHuman）
+        RoutingDecisionBO decision = routeDispatcher.dispatch(confidence, classification.costMs(),
+                classification.needsHuman());
 
         // 4. 追加上下文
         if (request.getSessionId() != null) {
@@ -49,7 +48,8 @@ public class MasterAgent {
         long totalCost = System.currentTimeMillis() - start;
         log.info("主Agent处理完成, sessionId={}, intent={}, confidence={}, decision={}, cost={}ms",
                 request.getSessionId(), decision.getIntentType(),
-                decision.getConfidence(), decision.isFallback() ? "FALLBACK" : decision.getTargetAgentId(),
+                decision.getConfidence(), decision.isNeedsHuman() ? "HUMAN" :
+                        decision.isFallback() ? "FALLBACK" : decision.getTargetAgentId(),
                 totalCost);
 
         return decision;

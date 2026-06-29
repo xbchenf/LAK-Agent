@@ -149,6 +149,13 @@ public class AuditLogQueryService {
     /** URI → 操作类型中文名 */
     private String uriToLabel(String uri) {
         if (uri == null) return "--";
+        if (uri.contains("SESSION_ENQUEUE_OPERATOR")) return "会话入队";
+        if (uri.contains("SESSION_TAKEOVER_OPERATOR")) return "坐席接管";
+        if (uri.contains("OPERATOR_MESSAGE_SEND")) return "坐席消息";
+        if (uri.contains("SESSION_CLOSE_OPERATOR")) return "会话关闭";
+        if (uri.contains("SESSION_HANDOFF_REJECTED")) return "拒绝转人工";
+        if (uri.contains("/operator/sessions")) return "坐席会话";
+        if (uri.contains("/operator/tickets")) return "工单处理";
         if (uri.contains("/chat")) return "智能问答";
         if (uri.contains("/tickets")) return "投诉建议";
         if (uri.contains("/knowledge")) return "知识库管理";
@@ -157,7 +164,7 @@ public class AuditLogQueryService {
         if (uri.contains("/admin/sensitive-words")) return "敏感词管理";
         if (uri.contains("/admin/audit-logs")) return "操作审计";
         if (uri.contains("/auth/")) return "认证登录";
-        return uri; // fallback: 直接显示 URI
+        return uri;
     }
 
     /** 批量查询用户名 */

@@ -19,6 +19,8 @@ public class RoutingDecisionBO {
     private String targetAgentId;
     /** 是否走兜底 */
     private boolean fallback;
+    /** 是否需要转人工坐席 */
+    private boolean needsHuman;
     /** 分类依据（调试用） */
     private String reasoning;
     /** 分类耗时 */

@@ -37,3 +37,4 @@ export function getChunks(docId: string): Promise<{ code: number; message: strin
 export function reindexDocument(docId: string): Promise<{ code: number; message: string; data: DocumentVO }> {
   return request.post(`/knowledge/documents/${docId}/reindex`)
 }
+

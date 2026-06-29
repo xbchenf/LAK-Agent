@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @ToString(callSuper = true)
@@ -29,4 +31,20 @@ public class Ticket extends BaseEntity {
     private String status;
     @TableField("external_ticket_id")
     private String externalTicketId;
+
+    // === 人工坐席字段 ===
+    /** 坐席用户ID */
+    @TableField("assignee_id")
+    private Long assigneeId;
+    /** 接单时间 */
+    @TableField("assigned_at")
+    private LocalDateTime assignedAt;
+    /** 处理完成时间 */
+    @TableField("handled_at")
+    private LocalDateTime handledAt;
+    /** 坐席处理意见 */
+    @TableField("handler_notes")
+    private String handlerNotes;
+    /** 优先级: NORMAL / URGENT / LOW */
+    private String priority;
 }

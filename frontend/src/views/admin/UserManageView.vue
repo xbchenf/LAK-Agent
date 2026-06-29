@@ -11,16 +11,13 @@ const users = ref<UserVO[]>([])
 const roles = ref<RoleVO[]>([])
 const loading = ref(false)
 
-// 搜索
 const searchUsername = ref('')
 
-// 新增/编辑弹窗
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingUser = ref<UserVO | null>(null)
 const form = ref({ username: '', password: '', realName: '', roleId: null as number | null, status: 'ACTIVE' as string })
 
-// 重置密码弹窗
 const pwdDialogVisible = ref(false)
 const pwdUserId = ref<number | null>(null)
 const newPassword = ref('')
@@ -106,46 +103,56 @@ async function doResetPwd() {
     pwdDialogVisible.value = false
   } catch { /* handled by interceptor */ }
 }
+
+const roleClass = (roleName: string) => {
+  if (roleName?.includes('ADMIN')) return 'role-admin'
+  if (roleName?.includes('OPERATOR')) return 'role-operator'
+  return 'role-user'
+}
 </script>
 
 <template>
   <div class="user-page">
-    <div class="page-header">
-      <h3>用户管理</h3>
-      <div class="header-right">
-        <el-input v-model="searchUsername" placeholder="搜索用户名" clearable style="width:180px"
-          @keyup.enter="load()" @clear="load()">
-          <template #append><el-button @click="load()">搜索</el-button></template>
-        </el-input>
-        <el-button type="primary" @click="openCreate()" style="margin-left:12px">+ 新增用户</el-button>
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <input v-model="searchUsername" class="search-input" placeholder="🔍 搜索用户名…"
+          @keyup.enter="load()" />
+        <button class="btn btn-outline" @click="load()">搜索</button>
       </div>
+      <button class="btn btn-primary" @click="openCreate()">+ 新增用户</button>
     </div>
 
-    <el-table :data="users" v-loading="loading" stripe>
-      <el-table-column prop="username" label="用户名" width="140" />
-      <el-table-column prop="realName" label="姓名" width="120">
-        <template #default="{ row }">{{ row.realName || '--' }}</template>
-      </el-table-column>
-      <el-table-column label="角色" width="140">
-        <template #default="{ row }">{{ row.roleName || '未分配' }}</template>
-      </el-table-column>
-      <el-table-column label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'danger'" size="small">
-            {{ StatusLabels[row.status] || row.status }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="createTime" label="创建时间" width="170" />
-      <el-table-column label="操作" min-width="160">
-        <template #default="{ row }">
-          <el-button size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button size="small" type="warning" @click="openResetPwd(row)">重置密码</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- Table -->
+    <div class="table-wrap">
+      <el-table :data="users" v-loading="loading" stripe>
+        <el-table-column prop="username" label="用户名" width="140" />
+        <el-table-column prop="realName" label="姓名" width="120">
+          <template #default="{ row }">{{ row.realName || '--' }}</template>
+        </el-table-column>
+        <el-table-column label="角色" width="140">
+          <template #default="{ row }">
+            <span :class="['role-badge', roleClass(row.roleName)]">{{ row.roleName || '未分配' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <span :class="['status-badge', row.status === 'ACTIVE' ? 'status-active' : 'status-disabled']">
+              {{ StatusLabels[row.status] || row.status }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createTime" label="创建时间" width="170" />
+        <el-table-column label="操作" min-width="160">
+          <template #default="{ row }">
+            <span class="action-link" @click="openEdit(row)">编辑</span>
+            <span class="action-link" @click="openResetPwd(row)">重置密码</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
-    <!-- 新增/编辑弹窗 -->
+    <!-- Create/Edit Dialog -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="420px">
       <el-form label-width="80px">
         <el-form-item label="用户名" v-if="!isEdit">
@@ -175,7 +182,7 @@ async function doResetPwd() {
       </template>
     </el-dialog>
 
-    <!-- 重置密码弹窗 -->
+    <!-- Reset Password Dialog -->
     <el-dialog v-model="pwdDialogVisible" title="重置密码" width="360px">
       <el-input v-model="newPassword" type="password" placeholder="输入新密码（至少6位）" show-password />
       <template #footer>
@@ -187,8 +194,54 @@ async function doResetPwd() {
 </template>
 
 <style scoped>
-.user-page { padding: 24px; max-width: 1100px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.page-header h3 { margin: 0; font-size: 20px; }
-.header-right { display: flex; align-items: center; }
+.user-page { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+/* Toolbar */
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--color-bg-white); padding: 14px 20px;
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.search-input {
+  padding: 8px 14px; border: 1px solid var(--color-border); border-radius: var(--radius);
+  font-size: 13px; outline: none; width: 220px; font-family: inherit; color: var(--color-text);
+}
+.search-input:focus { border-color: var(--color-primary-light); }
+.search-input::placeholder { color: var(--color-text-muted); }
+
+.btn {
+  padding: 8px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.btn-outline { border: 1px solid var(--color-border); background: var(--color-bg-white); color: var(--color-text-secondary); }
+.btn-outline:hover { border-color: var(--color-primary-light); color: var(--color-primary); }
+.btn-primary { background: var(--color-primary); color: #fff; border: none; }
+.btn-primary:hover { background: var(--color-primary-hover); }
+
+/* Table wrap */
+.table-wrap {
+  background: var(--color-bg-white); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--color-border); overflow: hidden;
+}
+
+/* Role badges */
+.role-badge {
+  display: inline-block; font-size: 11px; padding: 3px 12px; border-radius: 12px; font-weight: 500;
+}
+.role-admin { background: #fef3c7; color: #92400e; }
+.role-operator { background: var(--color-primary-bg); color: #1d4ed8; }
+.role-user { background: var(--color-bg-hover); color: var(--color-text-secondary); }
+
+/* Status badges */
+.status-badge {
+  display: inline-block; font-size: 10px; padding: 3px 10px; border-radius: 10px;
+}
+.status-active { background: #dcfce7; color: #16a34a; }
+.status-disabled { background: #fef2f2; color: #dc2626; }
+
+/* Action links */
+.action-link { font-size: 12px; color: var(--color-primary); cursor: pointer; margin-right: 12px; }
+.action-link:hover { text-decoration: underline; }
 </style>

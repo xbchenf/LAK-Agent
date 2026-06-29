@@ -18,6 +18,7 @@ import com.lak.ai.service.rag.embedding.EmbeddingService;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.filter.Filter;
 import dev.langchain4j.store.embedding.filter.MetadataFilterBuilder;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
@@ -313,12 +314,38 @@ public class KnowledgeDocumentService {
 
         List<DocumentChunkVO> result = new ArrayList<>();
         try {
-            // 通过 Qdrant scroll 按 docId metadata 过滤查询分块
-            // 注意: embeddingStore 未直接暴露 scroll API，通过包装调用
-            // 此处为简化实现 — 返回空的 chunk 列表，仅记录总块数
-            log.debug("getChunks docId={}, total chunks from DB={}", docId, entity.getChunkCount());
+            QdrantEmbeddingStore store = resolveEmbeddingStore(entity.getQdrantCollection());
+            Filter filter = MetadataFilterBuilder.metadataKey("docId").isEqualTo(docId);
+            log.info("getChunks: collection={}, docId={}, chunkCount={}",
+                    entity.getQdrantCollection(), docId, entity.getChunkCount());
+            Embedding dummyEmbedding = Embedding.from(new float[1024]);
+            var searchResult = store.search(
+                    EmbeddingSearchRequest.builder()
+                            .queryEmbedding(dummyEmbedding)
+                            .filter(filter)
+                            .maxResults(entity.getChunkCount() > 0 ? entity.getChunkCount() : 100)
+                            .minScore(0.0)
+                            .build()
+            );
+            log.info("getChunks: searchResult.matches().size={}", searchResult.matches().size());
+
+            for (var match : searchResult.matches()) {
+                TextSegment seg = match.embedded();
+                String text = seg != null ? seg.text() : "";
+                String chunkIdx = "0";
+                if (seg != null && seg.metadata() != null) {
+                    chunkIdx = seg.metadata().getString("chunkIndex");
+                    if (chunkIdx == null || chunkIdx.isEmpty()) chunkIdx = "0";
+                }
+                DocumentChunkVO vo = new DocumentChunkVO();
+                vo.setChunkIndex(Integer.parseInt(chunkIdx.isEmpty() ? "0" : chunkIdx));
+                vo.setText(text != null && text.length() > 200 ? text.substring(0, 200) : text);
+                vo.setTextLength(text != null ? text.length() : 0);
+                result.add(vo);
+            }
+            log.debug("getChunks docId={}, found={} chunks", docId, result.size());
         } catch (Exception e) {
-            log.warn("getChunks 查询 Qdrant 失败, docId={}", docId, e);
+            log.error("getChunks 查询 Qdrant 失败, docId={}, error={}", docId, e.getMessage(), e);
         }
         return result;
     }
@@ -412,6 +439,14 @@ public class KnowledgeDocumentService {
     /**
      * 根据 Collection 名称获取对应的 QdrantEmbeddingStore。
      */
+    private String extractText(Map<String, com.google.protobuf.Value> payload) {
+        // LangChain4j QdrantEmbeddingStore stores text under "text_segment" key
+        if (payload.containsKey("text_segment")) return payload.get("text_segment").getStringValue();
+        if (payload.containsKey("text")) return payload.get("text").getStringValue();
+        if (payload.containsKey("page_content")) return payload.get("page_content").getStringValue();
+        return "";
+    }
+
     private QdrantEmbeddingStore resolveEmbeddingStore(String collection) {
         if (RagConstants.COLLECTION_POLICY.equals(collection)) {
             return policyEmbeddingStore;

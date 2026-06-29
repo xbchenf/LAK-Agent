@@ -1,6 +1,8 @@
 package com.lak.ai.security.filter;
 
 import com.lak.ai.common.filter.CachedBodyHttpServletRequestWrapper;
+import java.util.ArrayList;
+import java.util.List;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -121,5 +123,9 @@ public class SensitiveWordPreCheckFilter implements Filter {
 
     public int getWordCount() {
         return sensitiveWords.size();
+    }
+
+    public List<String> getWords() {
+        return new ArrayList<>(sensitiveWords);
     }
 }

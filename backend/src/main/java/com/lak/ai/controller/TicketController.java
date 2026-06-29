@@ -24,12 +24,18 @@ public class TicketController {
     private final SessionManager sessionManager;
 
     /**
-     * 当前用户的工单列表 — GET /api/v1/tickets/mine
+     * 工单列表 — GET /api/v1/tickets/mine
+     * ADMIN/OPERATOR 可查看所有工单，普通用户仅看自己的
      */
     @GetMapping("/mine")
     public ApiResponse<java.util.List<Ticket>> myTickets(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         if (userId == null) return ApiResponse.error(401, "未认证");
+        @SuppressWarnings("unchecked")
+        java.util.List<String> roles = (java.util.List<String>) request.getAttribute("roles");
+        if (roles != null && (roles.contains("ADMIN") || roles.contains("OPERATOR"))) {
+            return ApiResponse.success(ticketAdapter.queryAllTickets());
+        }
         return ApiResponse.success(ticketAdapter.queryUserTickets(userId));
     }
 

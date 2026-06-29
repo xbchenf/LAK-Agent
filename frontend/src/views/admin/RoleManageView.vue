@@ -52,7 +52,6 @@ function isParentIndeterminate(menu: MenuVO): boolean {
 
 function handleParentChange(menu: MenuVO, checked: boolean) {
   if (!menu.children || menu.children.length === 0) {
-    // 无子菜单：直接切换自身
     if (checked) {
       checkedIds.value = [...new Set([...checkedIds.value, menu.id])]
     } else {
@@ -73,7 +72,6 @@ function handleChildChange(parent: MenuVO, child: MenuVO, checked: boolean) {
     checkedIds.value = [...new Set([...checkedIds.value, child.id, parent.id])]
   } else {
     checkedIds.value = checkedIds.value.filter(id => id !== child.id)
-    // 所有子节点都取消→父节点也取消
     if (parent.children && !parent.children.some(c => checkedIds.value.includes(c.id))) {
       checkedIds.value = checkedIds.value.filter(id => id !== parent.id)
     }
@@ -82,7 +80,6 @@ function handleChildChange(parent: MenuVO, child: MenuVO, checked: boolean) {
 
 async function savePermissions() {
   if (!editingRole.value) return
-  // 只保存子节点对应的 menuIds（父节点由子节点推出来，或者也保存都没关系——后端只认 menu_ids）
   try {
     await updateRoleMenus(editingRole.value.id, checkedIds.value)
     ElMessage.success('权限已更新')
@@ -95,20 +92,17 @@ async function savePermissions() {
 <template>
   <div class="role-page">
     <div class="page-header">
-      <h3>角色管理</h3>
       <span class="hint">共 {{ roles.length }} 个角色 | 勾选功能菜单分配权限</span>
     </div>
 
     <el-row :gutter="16" v-loading="loading">
       <el-col v-for="role in roles" :key="role.id" :span="8" style="margin-bottom:16px">
-        <el-card>
+        <el-card class="role-card">
           <h4>{{ role.roleName || role.roleCode }}</h4>
           <p class="role-code">{{ role.roleCode }}</p>
           <div class="perm-tags">
-            <el-tag v-for="id in role.menuIds" :key="id" size="small" style="margin:2px">
-              {{ menuName(id) }}
-            </el-tag>
-            <span v-if="!role.menuIds.length" style="color:#c0c4cc;font-size:12px">无权限</span>
+            <span v-for="id in role.menuIds" :key="id" class="perm-tag">{{ menuName(id) }}</span>
+            <span v-if="!role.menuIds.length" class="no-perm">无权限</span>
           </div>
           <el-button size="small" style="margin-top:12px" @click="openEdit(role)">编辑权限</el-button>
         </el-card>
@@ -116,10 +110,9 @@ async function savePermissions() {
     </el-row>
 
     <el-dialog v-model="dialogVisible" title="编辑权限" width="420px">
-      <p style="color:#909399;margin-bottom:16px">
+      <p class="dialog-hint">
         角色: {{ editingRole?.roleName || editingRole?.roleCode }} | 勾选可访问的功能菜单
       </p>
-
       <div v-for="menu in menus" :key="menu.id" style="margin-bottom:12px">
         <el-checkbox
           :model-value="isParentChecked(menu)"
@@ -138,7 +131,6 @@ async function savePermissions() {
           </el-checkbox>
         </div>
       </div>
-
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="savePermissions">保存</el-button>
@@ -148,11 +140,24 @@ async function savePermissions() {
 </template>
 
 <style scoped>
-.role-page { padding: 24px; max-width: 960px; }
+.role-page { padding: 24px; }
 .page-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
-.page-header h3 { margin: 0; }
-.hint { color: #909399; font-size: 13px; }
-h4 { margin: 0 0 4px; font-size: 15px; }
-.role-code { margin: 0 0 8px; color: var(--el-color-primary); font-size: 13px; font-weight: 600; }
-.perm-tags { min-height: 24px; }
+.page-header h3 { margin: 0; font-size: 20px; color: var(--color-text); }
+.hint { color: var(--color-text-muted); font-size: 13px; }
+
+.role-card {
+  transition: all .2s;
+}
+.role-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
+h4 { margin: 0 0 4px; font-size: 15px; color: var(--color-text); }
+.role-code { margin: 0 0 8px; color: var(--color-primary); font-size: 13px; font-weight: 600; }
+.perm-tags { min-height: 24px; display: flex; flex-wrap: wrap; gap: 4px; }
+.perm-tag {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  background: var(--color-primary-bg); color: var(--color-primary);
+  border: 1px solid var(--color-primary-bg-hover);
+}
+.no-perm { color: var(--color-text-muted); font-size: 12px; }
+.dialog-hint { color: var(--color-text-muted); margin-bottom: 16px; }
 </style>

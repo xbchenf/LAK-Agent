@@ -2,8 +2,10 @@ package com.lak.ai.service.ticket;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.lak.ai.mapper.ChatSessionMapper;
+import com.lak.ai.mapper.SysUserMapper;
 import com.lak.ai.mapper.TicketMapper;
 import com.lak.ai.model.entity.ChatSession;
+import com.lak.ai.model.entity.SysUser;
 import com.lak.ai.model.entity.Ticket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ public class TicketAdapter {
 
     private final TicketMapper ticketMapper;
     private final ChatSessionMapper sessionMapper;
+    private final SysUserMapper sysUserMapper;
 
     /**
      * 创建工单 — 将 SlotFilling 结果写入 ticket 表。
@@ -36,15 +39,26 @@ public class TicketAdapter {
     public String createTicket(String sessionId, Map<String, String> slotValues) {
         String ticketNo = generateTicketNo();
 
+        // 联系人姓名：优先从已登录用户取，兜底用槽值
+        String contactName = "";
+        ChatSession session = sessionMapper.selectOne(
+                new LambdaQueryWrapper<ChatSession>().eq(ChatSession::getSessionId, sessionId));
+        if (session != null && session.getUserId() != null) {
+            SysUser user = sysUserMapper.selectById(session.getUserId());
+            contactName = (user != null && user.getRealName() != null) ? user.getRealName() : "";
+        }
+        if (contactName.isBlank()) {
+            contactName = slotValues.getOrDefault("contactName", "");
+        }
+
         Ticket ticket = new Ticket();
         ticket.setTicketNo(ticketNo);
         ticket.setSessionId(sessionId);
         ticket.setComplaintType(slotValues.getOrDefault("complaintType", "OTHER"));
-        ticket.setContactName(slotValues.getOrDefault("contactName", ""));
+        ticket.setContactName(contactName);
         ticket.setContactPhone(slotValues.getOrDefault("contactPhone", ""));
         ticket.setDescription(slotValues.getOrDefault("description", ""));
         ticket.setStatus("PENDING");
-        ticket.setAttachmentUrl(slotValues.get("attachment"));
 
         ticketMapper.insert(ticket);
         log.info("工单创建成功, ticketNo={}, sessionId={}", ticketNo, sessionId);
@@ -70,6 +84,15 @@ public class TicketAdapter {
         return ticketMapper.selectList(
                 new LambdaQueryWrapper<Ticket>()
                         .in(Ticket::getSessionId, sessionIds)
+                        .orderByDesc(Ticket::getCreateTime));
+    }
+
+    /**
+     * 查询所有工单（管理员/坐席用）
+     */
+    public List<Ticket> queryAllTickets() {
+        return ticketMapper.selectList(
+                new LambdaQueryWrapper<Ticket>()
                         .orderByDesc(Ticket::getCreateTime));
     }
 

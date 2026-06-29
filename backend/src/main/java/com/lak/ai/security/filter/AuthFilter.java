@@ -38,7 +38,8 @@ public class AuthFilter implements Filter {
             "/api/v1/health",
             "/api/v1/auth/login",
             "/api/v1/auth/captcha",
-            "/api/v1/auth/refresh"
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/register"
     );
 
     @Value("${lak.jwt.secret}")
@@ -50,21 +51,21 @@ public class AuthFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         String path = httpRequest.getRequestURI();
 
-        // 白名单放行（无需认证）
-        if (WHITELIST_PATHS.stream().anyMatch(path::equals)) {
+        // 白名单放行（无需认证）+ WebSocket 握手
+        if (WHITELIST_PATHS.stream().anyMatch(path::equals)
+                || path.startsWith("/ws/")) {
             chain.doFilter(request, response);
             return;
         }
 
-        // 非白名单端点：必须提供有效 JWT
-        String authHeader = httpRequest.getHeader(AUTH_HEADER);
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+        // 非白名单端点：必须提供有效 JWT（Header 优先，Query 参数兜底 — 供 EventSource 等无 Header API 使用）
+        String token = extractToken(httpRequest);
+        if (token == null) {
             sendUnauthorized(response, "LAK-01-001", "未认证，请先登录");
             return;
         }
 
         try {
-            String token = authHeader.substring(BEARER_PREFIX.length());
             SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
             Claims claims = Jwts.parser()
                     .verifyWith(key)
@@ -85,6 +86,21 @@ public class AuthFilter implements Filter {
             log.info("JWT 解析失败, path={}, reason={}", path, e.getMessage());
             sendUnauthorized(response, "LAK-01-001", "未认证，请先登录");
         }
+    }
+
+    /** 从 Header 或 Query 参数中提取 JWT */
+    private String extractToken(HttpServletRequest request) {
+        // Header 优先
+        String authHeader = request.getHeader(AUTH_HEADER);
+        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+            return authHeader.substring(BEARER_PREFIX.length());
+        }
+        // Query 参数兜底 — EventSource 无法设置 Header
+        String queryToken = request.getParameter("token");
+        if (queryToken != null && !queryToken.isBlank()) {
+            return queryToken;
+        }
+        return null;
     }
 
     private void sendUnauthorized(ServletResponse response, String errorCode, String message)

@@ -7,10 +7,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -21,6 +23,12 @@ public class AdminController {
 
     private final SensitiveWordPreCheckFilter sensitiveWordFilter;
     private final MenuPermissionChecker menuPermissionChecker;
+
+    @GetMapping("/sensitive-words/list")
+    public ApiResponse<List<String>> listSensitiveWords(HttpServletRequest request) {
+        menuPermissionChecker.requireMenu(request, "sensitive");
+        return ApiResponse.success(sensitiveWordFilter.getWords());
+    }
 
     @PostMapping("/sensitive-words/reload")
     public ApiResponse<Map<String, Object>> reloadSensitiveWords(HttpServletRequest request) {

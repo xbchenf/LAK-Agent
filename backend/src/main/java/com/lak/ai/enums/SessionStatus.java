@@ -29,5 +29,11 @@ public enum SessionStatus {
     TICKET_SUBMIT,
 
     /** 会话关闭（用户主动或超时） */
-    CLOSED
+    CLOSED,
+
+    /** 等待人工坐席接入（已入队列） */
+    WAITING_OPERATOR,
+
+    /** 人工坐席处理中 */
+    HUMAN_HANDLING
 }

@@ -6,6 +6,7 @@ import com.lak.ai.model.bo.AgentRequest;
 import com.lak.ai.model.bo.AgentResponse;
 import com.lak.ai.model.bo.ContextMessage;
 import com.lak.ai.model.bo.RoutingDecisionBO;
+import com.lak.ai.service.agent.master.FallbackHandler;
 import com.lak.ai.service.agent.master.MasterAgent;
 import com.lak.ai.service.agent.scheduler.SubAgentScheduler;
 import com.lak.ai.service.agent.sub.PolicyAgentTools;
@@ -42,30 +43,68 @@ public class ChatService {
     private final ProcedureAgentTools procedureTools;
     private final SlotFillingEngine slotFillingEngine;
     private final TicketAdapter ticketAdapter;
+    private final FallbackHandler fallbackHandler;
+    private final MessagePushService pushService;
+
+    /** 兜底计数器：sessionId → 连续兜底次数 */
+    private final java.util.Map<String, Integer> fallbackCount = new java.util.concurrent.ConcurrentHashMap<>();
 
     public ChatService(SessionManager sessionManager, ContextWindow contextWindow,
             MasterAgent masterAgent, SubAgentScheduler scheduler, ComplianceValidator validator,
             PolicyAgentService policyAgentService, PolicyAgentTools policyTools,
             ProcedureAgentService procedureAgentService, ProcedureAgentTools procedureTools,
-            SlotFillingEngine slotFillingEngine, TicketAdapter ticketAdapter) {
+            SlotFillingEngine slotFillingEngine, TicketAdapter ticketAdapter,
+            FallbackHandler fallbackHandler, MessagePushService pushService) {
         this.sessionManager = sessionManager; this.contextWindow = contextWindow;
         this.masterAgent = masterAgent; this.scheduler = scheduler; this.validator = validator;
         this.policyAgentService = policyAgentService; this.policyTools = policyTools;
         this.procedureAgentService = procedureAgentService; this.procedureTools = procedureTools;
         this.slotFillingEngine = slotFillingEngine;
         this.ticketAdapter = ticketAdapter;
+        this.fallbackHandler = fallbackHandler;
+        this.pushService = pushService;
     }
 
     // ==================== JSON 模式 ====================
 
     public ChatResult processMessage(Long userId, String sessionId, String message) {
         if (sessionId == null || sessionId.isBlank()) sessionId = sessionManager.create(userId);
-        if (!sessionManager.isActive(sessionId)) return ChatResult.error("会话不存在或已关闭");
+        if (!sessionManager.isActive(sessionId)) {
+            sessionId = sessionManager.create(userId); // 自动创建新会话
+        }
 
         // ── COLLECT_INFO 短路路由 ──
         SessionStatus currentStatus = sessionManager.getStatus(sessionId);
         if (currentStatus == SessionStatus.COLLECT_INFO) {
             return handleCollectInfo(sessionId, userId, message);
+        }
+
+        // ── 人工坐席处理中 → 消息存历史，不调AI ──
+        if (currentStatus == SessionStatus.HUMAN_HANDLING) {
+            appendToContext(sessionId, "user", message);
+            pushService.pushToOperator(sessionId, "user", message);
+            return ChatResult.of(sessionId,
+                    AgentResponse.builder()
+                            .answer("")  // 不返回答复，由坐席回复
+                            .confidence(1.0).intentType("HUMAN_HANDLING")
+                            .extra(Map.of("state", "HUMAN_HANDLING")).build(),
+                    null);
+        }
+
+        // ── 已在人工排队 → 返回排队状态 ──
+        if (currentStatus == SessionStatus.WAITING_OPERATOR) {
+            int pos = sessionManager.getQueuePosition(sessionId);
+            return ChatResult.of(sessionId,
+                    AgentResponse.builder()
+                            .answer("您已在人工排队中，当前排在第 " + pos + " 位。如情况紧急，请拨打 12345 政务服务热线。")
+                            .confidence(1.0).intentType("WAITING_OPERATOR")
+                            .extra(Map.of("state", "WAITING_OPERATOR", "queuePosition", pos)).build(),
+                    null);
+        }
+
+        // ── 待确认转人工 → 判断用户是确认还是拒绝 ──
+        if (sessionManager.hasPendingHandoff(sessionId)) {
+            return handleHandoffConfirmation(sessionId, message);
         }
 
         // ── 正常流程：意图分类 → 路由 ──
@@ -76,19 +115,57 @@ public class ChatService {
         sessionManager.transition(sessionId, SessionStatus.INTENT_CHECK);
         RoutingDecisionBO decision = masterAgent.route(request);
 
+        // ── 用户主动请求转人工 → 直接入队列 ──
+        if (decision.isNeedsHuman()) {
+            AgentResponse handoffResp = fallbackHandler.handleDirectHandoff(sessionId,
+                    decision.getConfidence(), decision.getReasoning());
+            appendToContext(sessionId, "assistant", handoffResp.getAnswer());
+            fallbackCount.remove(sessionId); // 重置兜底计数
+            return ChatResult.of(sessionId, handoffResp, decision);
+        }
+
         if (decision.isFallback()) {
+            // 闲聊/无关话题 → 友好引导，不触发转人工
+            if (decision.getIntentType() == IntentType.CHITCHAT) {
+                fallbackCount.remove(sessionId);
+                AgentResponse chatResp = fallbackHandler.handleChitchat();
+                appendToContext(sessionId, "assistant", chatResp.getAnswer());
+                return ChatResult.of(sessionId, chatResp, decision);
+            }
+            // 连续兜底计数
+            int count = fallbackCount.merge(sessionId, 1, Integer::sum);
+            if (count >= 2) {
+                // T3 触发 → A 类确认
+                fallbackCount.remove(sessionId);
+                AgentResponse confirmResp = fallbackHandler.handleWithConfirm(sessionId,
+                        decision.getConfidence(), decision.getReasoning(), "CONSECUTIVE_FALLBACK");
+                appendToContext(sessionId, "assistant", confirmResp.getAnswer());
+                return ChatResult.of(sessionId, confirmResp, decision);
+            }
             sessionManager.transition(sessionId, SessionStatus.FALLBACK);
-            AgentResponse fallbackResponse = masterAgent.fallback(sessionId, decision);
+            AgentResponse fallbackResponse = fallbackHandler.handleLowConfidence(sessionId,
+                    decision.getConfidence(), decision.getReasoning());
             enforceCompliance(sessionId, fallbackResponse);
             appendToContext(sessionId, "assistant", fallbackResponse.getAnswer());
             return ChatResult.of(sessionId, fallbackResponse, decision);
         }
 
+        // AI 正常回答 → 重置兜底计数
+        fallbackCount.remove(sessionId);
         sessionManager.transition(sessionId, SessionStatus.ANSWERING);
         AgentResponse response = scheduler.dispatch(decision.getIntentType(), request);
         if (response == null) {
+            int cnt = fallbackCount.merge(sessionId, 1, Integer::sum);
+            if (cnt >= 2) {
+                fallbackCount.remove(sessionId);
+                AgentResponse confirmResp = fallbackHandler.handleWithConfirm(sessionId,
+                        decision.getConfidence(), "调度失败", "CONSECUTIVE_FALLBACK");
+                appendToContext(sessionId, "assistant", confirmResp.getAnswer());
+                return ChatResult.of(sessionId, confirmResp, decision);
+            }
             sessionManager.transition(sessionId, SessionStatus.FALLBACK);
-            AgentResponse fallback = masterAgent.fallback(sessionId, decision);
+            AgentResponse fallback = fallbackHandler.handleLowConfidence(sessionId,
+                    decision.getConfidence(), "调度失败");
             enforceCompliance(sessionId, fallback);
             appendToContext(sessionId, "assistant", fallback.getAnswer());
             return ChatResult.of(sessionId, fallback, decision);
@@ -114,18 +191,18 @@ public class ChatService {
     // ==================== SSE 流式模式 ====================
 
     public SseEmitter processMessageStream(Long userId, String sessionId, String message) {
-        final String sid = (sessionId == null || sessionId.isBlank())
-                ? sessionManager.create(userId) : sessionId;
+        final String[] sidRef = { (sessionId == null || sessionId.isBlank())
+                ? sessionManager.create(userId) : sessionId };
         final Long uid = userId;
         final String msg = message;
         SseEmitter emitter = new SseEmitter(120_000L);
 
         new Thread(() -> {
             try {
-                if (!sessionManager.isActive(sid)) {
-                    emitter.send(SseEmitter.event().name("error").data(Map.of("message","会话不存在")));
-                    emitter.complete(); return;
+                if (!sessionManager.isActive(sidRef[0])) {
+                    sidRef[0] = sessionManager.create(uid);
                 }
+                final String sid = sidRef[0];
 
                 // ── COLLECT_INFO 短路路由 ──
                 SessionStatus currentStatus = sessionManager.getStatus(sid);
@@ -134,19 +211,84 @@ public class ChatService {
                     return;
                 }
 
+                // ── WAITING_OPERATOR / HUMAN_HANDLING / needsHuman 处理 ──
+                SessionStatus sStatus = sessionManager.getStatus(sid);
+                if (sStatus == SessionStatus.HUMAN_HANDLING) {
+                    contextWindow.append(sid, "user", msg);
+                    pushService.pushToOperator(sid, "user", msg);
+                    emitter.send(SseEmitter.event().name("done").data(Map.of(
+                            "sessionId", sid, "state", "HUMAN_HANDLING")));
+                    emitter.complete(); return;
+                }
+                if (sStatus == SessionStatus.WAITING_OPERATOR) {
+                    int pos = sessionManager.getQueuePosition(sid);
+                    emitter.send(SseEmitter.event().name("message")
+                            .data("您已在人工排队中，当前排在第 " + pos + " 位。如情况紧急，请拨打 12345 政务服务热线。"));
+                    emitter.send(SseEmitter.event().name("done")
+                            .data(Map.of("sessionId", sid, "state", "WAITING_OPERATOR", "queuePosition", pos)));
+                    emitter.complete(); return;
+                }
+                if (sessionManager.hasPendingHandoff(sid)) {
+                    ChatResult cr = handleHandoffConfirmation(sid, msg);
+                    emitter.send(SseEmitter.event().name("message").data(cr.response().getAnswer()));
+                    Map<String, Object> dp = new LinkedHashMap<>();
+                    dp.put("sessionId", sid);
+                    dp.put("intentType", cr.response().getIntentType());
+                    if (cr.response().getExtra() != null) {
+                        dp.put("extra", cr.response().getExtra());
+                        // 提取 state 到顶层，供前端 WebSocket 连接判断
+                        Object state = cr.response().getExtra().get("state");
+                        if (state != null) dp.put("state", state);
+                    }
+                    emitter.send(SseEmitter.event().name("done").data(dp));
+                    appendToContext(sid, "assistant", cr.response().getAnswer());
+                    emitter.complete(); return;
+                }
+
                 // ── 正常流程 ──
                 contextWindow.append(sid, "user", msg);
                 sessionManager.transition(sid, SessionStatus.INTENT_CHECK);
                 RoutingDecisionBO decision = masterAgent.route(request(uid, sid, msg));
 
+                // ── 用户主动请求转人工 ──
+                if (decision.isNeedsHuman()) {
+                    AgentResponse hr = fallbackHandler.handleDirectHandoff(sid,
+                            decision.getConfidence(), decision.getReasoning());
+                    emitter.send(SseEmitter.event().name("message").data(hr.getAnswer()));
+                    emitter.send(SseEmitter.event().name("done").data(Map.of(
+                            "sessionId", sid, "intentType", "REQUEST_HUMAN",
+                            "state", "WAITING_OPERATOR")));
+                    appendToContext(sid, "assistant", hr.getAnswer());
+                    fallbackCount.remove(sid);
+                    emitter.complete(); return;
+                }
+
                 if (decision.isFallback()) {
-                    AgentResponse r = masterAgent.fallback(sid, decision);
+                    AgentResponse r;
+                    if (decision.getIntentType() == IntentType.CHITCHAT) {
+                        fallbackCount.remove(sid);
+                        r = fallbackHandler.handleChitchat();
+                    } else {
+                        int count = fallbackCount.merge(sid, 1, Integer::sum);
+                        if (count >= 2) {
+                            fallbackCount.remove(sid);
+                            r = fallbackHandler.handleWithConfirm(sid,
+                                    decision.getConfidence(), decision.getReasoning(), "CONSECUTIVE_FALLBACK");
+                        } else {
+                            sessionManager.transition(sid, SessionStatus.FALLBACK);
+                            r = fallbackHandler.handleLowConfidence(sid,
+                                    decision.getConfidence(), decision.getReasoning());
+                        }
+                    }
                     emitter.send(SseEmitter.event().name("message").data(r.getAnswer()));
-                    emitter.send(SseEmitter.event().name("done").data(Map.of("sessionId",sid,"intentType","FALLBACK")));
+                    emitter.send(SseEmitter.event().name("done").data(Map.of(
+                            "sessionId", sid, "intentType", "FALLBACK",
+                            "extra", r.getExtra() != null ? r.getExtra() : Map.of())));
                     appendToContext(sid, "assistant", r.getAnswer());
                     emitter.complete(); return;
                 }
 
+                fallbackCount.remove(sid);
                 sessionManager.transition(sid, SessionStatus.ANSWERING);
                 final String intentName = decision.getIntentType().name();
                 StringBuilder answerBuf = new StringBuilder();
@@ -211,6 +353,35 @@ public class ChatService {
         }).start();
 
         return emitter;
+    }
+
+    // ==================== 转人工确认处理 ====================
+
+    /** 处理用户对"是否转人工"的确认/拒绝 */
+    private ChatResult handleHandoffConfirmation(String sessionId, String message) {
+        String msg = message.trim();
+        // 确认关键词
+        boolean confirmed = msg.equals("好的") || msg.equals("好") || msg.equals("可以")
+                || msg.equals("是") || msg.equals("转") || msg.equals("嗯") || msg.equals("需要")
+                || msg.contains("转人工") || msg.contains("确认") || msg.equals("yes") || msg.equals("要");
+        // 拒绝关键词
+        boolean rejected = msg.equals("不用") || msg.equals("不用了") || msg.equals("算了")
+                || msg.equals("不") || msg.equals("不需要") || msg.equals("no") || msg.equals("不要");
+
+        if (confirmed) {
+            return ChatResult.of(sessionId, fallbackHandler.confirmHandoff(sessionId), null);
+        }
+        if (rejected) {
+            fallbackCount.remove(sessionId);
+            return ChatResult.of(sessionId, fallbackHandler.rejectHandoff(sessionId), null);
+        }
+        // 模糊回复 → 再次确认
+        return ChatResult.of(sessionId,
+                AgentResponse.builder()
+                        .answer("请确认是否需要转接人工坐席？（回复[好的]确认，回复[不用了]继续自助咨询）")
+                        .confidence(0.5).intentType("FALLBACK")
+                        .extra(Map.of("state", "PENDING_HANDOFF")).build(),
+                null);
     }
 
     // ==================== COLLECT_INFO 处理 ====================

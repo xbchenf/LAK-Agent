@@ -91,11 +91,7 @@ public class SlotFillingEngine {
         return List.of(
                 SlotDefinition.builder()
                         .name("complaintType").label("投诉类型").required(true)
-                        .promptTemplate("请问您要反馈的是哪类问题？\n1.治安投诉（打架斗殴、噪音扰民、赌博等）\n2.窗口服务投诉（户籍、身份证办理等）\n3.派出所/民警投诉\n4.其他")
-                        .build(),
-                SlotDefinition.builder()
-                        .name("contactName").label("联系人").required(true)
-                        .promptTemplate("请留下您的称呼：")
+                        .promptTemplate("请问您要反馈的是哪类问题？")
                         .build(),
                 SlotDefinition.builder()
                         .name("contactPhone").label("联系电话").required(true)
@@ -106,10 +102,6 @@ public class SlotFillingEngine {
                 SlotDefinition.builder()
                         .name("description").label("问题描述").required(true)
                         .promptTemplate("请详细描述您的问题：")
-                        .build(),
-                SlotDefinition.builder()
-                        .name("attachment").label("附件").required(false)
-                        .promptTemplate("如有相关材料可上传（可选），没有请回复 无 ：")
                         .build()
         );
     }
