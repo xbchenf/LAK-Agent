@@ -101,8 +101,8 @@ LAK-Agent/
   → session → ANSWERING
   → 检索: PolicyAgentTools.search(message)
     → HybridRetriever.search(query, "lak_policy_docs")
-      ├─ Dense检索: Qdrant gRPC 相似度搜索 minScore=0.55 → top 10
-      ├─ Keyword增强: 中文分词 → Qdrant filter 匹配 → 额外结果
+      ├─ Dense检索: Qdrant gRPC 向量相似度 minScore=0.55 → top 10
+      ├─ BM25检索: JVM 倒排索引关键词匹配 → top 10
       └─ RRF融合: Reciprocal Rank Fusion (k=60) → top 5 (相似度≥0.75)
     → SourceTracer.buildCitations(fragments)
       → 格式化为: 【sourceNo 第articleNo条】(生效: effectiveDate)\nfragment_text
@@ -140,10 +140,10 @@ public record SearchResult(String formattedText, List<Map<String, Object>> sourc
   │   ├─ store.search(embedding, topK=10, minScore=DENSE_MIN_SCORE=0.55)
   │   └─ 返回 List<TextSegment> + 相似度分数
   │
-  ├─ Keyword Boosting (倒排索引增强)
-  │   ├─ 中文分词 → 提取关键词
-  │   ├─ 构造 Qdrant filter: payload.keyword IN [kw1, kw2, ...]
-  │   └─ 返回额外匹配片段 (topK=10)
+  ├─ Qdrant 全文检索 (MatchText)
+  │   ├─ payload text_segment 字段全文索引
+  │   ├─ REST API scroll 查询 → top 10
+  │   └─ 与 Dense 结果并行检索（CompletableFuture）
   │
   └─ RRF 融合 (Reciprocal Rank Fusion)
       ├─ score_rrf = Σ( 1/(k + rank_i) )  // k=60
@@ -157,10 +157,11 @@ public record SearchResult(String formattedText, List<Map<String, Object>> sourc
 | 组件 | 职责 |
 |------|------|
 | `EmbeddingService` | 调用 text-embedding-v4 生成 1024 维向量 |
-| `HybridRetriever` | Dense + Keyword 两路检索 + RRF 融合 |
+| `HybridRetriever` | Dense + BM25 双路检索 + RRF 融合 |
+| `HybridRetriever (keyword)` | Qdrant 原生全文索引 —— REST API MatchText，配合 Dense 做关键词精确匹配 |
 | `DocumentChunker` | 结构感知分块：政策按"第X条"，办事指南按章节标题（"一、"/"二、"），无结构标记时 fallback 固定大小切分 |
 | `SourceTracer` | 构建结构化溯源引用 SourceCitation，生成 toMap() 供前端展示 |
-| `DocumentParser` | TXT/PDF/DOCX → 结构化纯文本。PDF: PDFBox → 无文本则 RapidOCR CLI 兜底扫描件。DOCX: Apache POI + Heading 样式 → Markdown |
+| `DocumentParser` | TXT/PDF/DOCX → 结构化纯文本。PDF: PDFBox 提取文本。扫描件不支持自动 OCR，需用 Umi-OCR/PaddleOCR/大模型等工具预处理为 TXT 后上传。DOCX: Apache POI + Heading 样式 → Markdown |
 
 #### 知识库文档管理流程
 

@@ -11,14 +11,12 @@ import java.util.concurrent.ExecutionException;
 
 /**
  * Qdrant Collection 初始化 — 启动时确保 Collection 存在。
- * <p>
- * QdrantClient Bean 由 {@link QdrantClientConfig} 提供。
  */
 @Slf4j
 @Component
 public class QdrantCollectionInitializer {
 
-    private static final int VECTOR_DIMENSION = 1024; // text-embedding-v4 实际维度
+    private static final int VECTOR_DIMENSION = 1024;
 
     private final QdrantClient client;
 
@@ -28,14 +26,12 @@ public class QdrantCollectionInitializer {
 
     @PostConstruct
     public void init() {
-        // 创建 Collection（幂等操作，已存在则跳过）
-        ensureCollection("lak_policy_docs", "政法政策法规");
-        ensureCollection("lak_procedure_docs", "公安办事指南");
+        ensureCollection("lak_policy_docs");
+        ensureCollection("lak_procedure_docs");
     }
 
-    private void ensureCollection(String name, String description) {
+    private void ensureCollection(String name) {
         try {
-            // 检查是否存在
             boolean exists = client.collectionExistsAsync(name).get();
             if (!exists) {
                 client.createCollectionAsync(name,
@@ -44,17 +40,13 @@ public class QdrantCollectionInitializer {
                                 .setDistance(Collections.Distance.Cosine)
                                 .build()
                 ).get();
-                log.info("Qdrant Collection 创建成功: {}, dim={}, desc={}", name, VECTOR_DIMENSION, description);
-            } else {
-                log.info("Qdrant Collection 已存在: {}", name);
+                log.info("Qdrant Collection 创建成功: {}, dim={}", name, VECTOR_DIMENSION);
             }
         } catch (ExecutionException | InterruptedException e) {
-            log.warn("Qdrant Collection 创建异常 ({}): {}", name, e.getMessage());
+            log.warn("Qdrant 初始化异常 ({}): {}", name, e.getMessage());
         }
     }
 
     @PreDestroy
-    public void cleanup() {
-        // QdrantClient 的 close 由 @Bean(destroyMethod = "close") 管理
-    }
+    public void cleanup() {}
 }

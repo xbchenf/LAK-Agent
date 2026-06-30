@@ -4,6 +4,7 @@ import type { DocumentVO, DocumentQueryDTO, DocumentChunkVO, PageResult, StatusA
 export function uploadDocument(formData: FormData): Promise<{ code: number; message: string; data: DocumentVO }> {
   return request.post('/knowledge/documents', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 180000,  // 3 分钟，OCR 扫描件可能很慢
   })
 }
 

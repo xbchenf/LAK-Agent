@@ -31,6 +31,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -60,6 +62,7 @@ public class KnowledgeDocumentService {
     private final EmbeddingService embeddingService;
     private final QdrantEmbeddingStore policyEmbeddingStore;
     private final QdrantEmbeddingStore procedureEmbeddingStore;
+    private final com.lak.ai.service.rag.retriever.Bm25Index bm25Index;
 
     public KnowledgeDocumentService(
             KnowledgeDocumentMapper documentMapper,
@@ -68,7 +71,8 @@ public class KnowledgeDocumentService {
             DocumentChunker documentChunker,
             EmbeddingService embeddingService,
             @Qualifier("policyEmbeddingStore") QdrantEmbeddingStore policyEmbeddingStore,
-            @Qualifier("procedureEmbeddingStore") QdrantEmbeddingStore procedureEmbeddingStore) {
+            @Qualifier("procedureEmbeddingStore") QdrantEmbeddingStore procedureEmbeddingStore,
+            com.lak.ai.service.rag.retriever.Bm25Index bm25Index) {
         this.documentMapper = documentMapper;
         this.fileStorageService = fileStorageService;
         this.documentParser = documentParser;
@@ -76,39 +80,20 @@ public class KnowledgeDocumentService {
         this.embeddingService = embeddingService;
         this.policyEmbeddingStore = policyEmbeddingStore;
         this.procedureEmbeddingStore = procedureEmbeddingStore;
+        this.bm25Index = bm25Index;
     }
 
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
-    private static final AtomicInteger SEQ = new AtomicInteger(1);
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final long MAX_FILE_SIZE = 20 * 1024 * 1024L; // 20MB
 
     /**
-     * 启动时从 DB 恢复当日序列号，避免重启后 docId 冲突。
-     */
-    @PostConstruct
-    public void initSeq() {
-        String todayPrefix = "DOC-" + LocalDate.now().format(DATE_FMT) + "-";
-        long count = documentMapper.selectCount(
-                new LambdaQueryWrapper<KnowledgeDocument>()
-                        .likeRight(KnowledgeDocument::getDocId, todayPrefix)
-        );
-        int nextSeq = (int) count + 1;
-        SEQ.set(nextSeq);
-        log.info("文档序列号初始化, todayPrefix={}, nextSeq={}", todayPrefix, nextSeq);
-    }
-
-    // ==================== 文档编号生成 ====================
-
-    /**
-     * 生成文档编号，格式: DOC-{yyyyMMdd}-{序列号(0001~9999)}。
+     * 生成文档编号，格式: DOC-{yyyyMMddHHmmss}-{4位随机}。
+     * 使用时间戳+随机数避免序列号冲突。
      */
     private String generateDocId() {
-        String date = LocalDate.now().format(DATE_FMT);
-        int seq = SEQ.getAndIncrement();
-        if (seq > 9999) {
-            SEQ.set(1);
-        }
-        return String.format("DOC-%s-%04d", date, seq);
+        String date = LocalDateTime.now().format(DATE_FMT);
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        return "DOC-" + date + "-" + suffix;
     }
 
     // ==================== 上传文档 ====================
@@ -251,6 +236,7 @@ public class KnowledgeDocumentService {
                     throw new KnowledgeException(4_404, "仅已发布状态可停用，当前: " + currentStatus);
                 }
                 deleteFromQdrant(entity.getDocId());
+                bm25Index.remove(entity.getDocId());
                 yield "EXPIRED";
             }
             case "reactivate" -> {
@@ -398,6 +384,8 @@ public class KnowledgeDocumentService {
                 Embedding embedding = embeddingService.embedForStore(chunk.getText());
                 store.add(embedding, segment);
             }
+
+            bm25Index.index(entity.getDocId(), text);
 
             log.info("文档向量化写入 Qdrant 完成, docId={}, chunks={}, collection={}",
                     entity.getDocId(), chunks.size(), entity.getQdrantCollection());
